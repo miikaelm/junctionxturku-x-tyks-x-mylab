@@ -106,23 +106,23 @@ Three primary roles (keep it to ~3; confirm with the mentor, see §10.1).
 ## 4. Functional requirements
 
 ### 4.1 Data layer (DATA)
-- [ ] **DATA-01 (M)** Load and join all CSVs (cultures ↔ patients ↔ isolates ↔ susceptibility, plus code tables).
-- [ ] **DATA-02 (M)** ❓ **First-isolate rule:** count only the first isolate per patient × organism × specimen type per analysis period. Apply this in every resistance-% calculation. (Explained in §11.)
-- [ ] **DATA-03 (M)** **Hospital-acquired flag:** inpatient sample taken on day ≥ 3 after `admission_date`, i.e. `sample_date − admission_date ≥ 2` days, with the admission day counted as day 1. Convention to be confirmed (§10.1).
-- [ ] **DATA-04 (M)** **Time windows** relative to the as-of date: rolling last 4 weeks, rolling last 12 months, calendar year, and an arbitrary custom range.
+- [x] **DATA-01 (M)** Load and join all CSVs (cultures ↔ patients ↔ isolates ↔ susceptibility, plus code tables).
+- [x] **DATA-02 (M)** ❓ **First-isolate rule:** count only the first isolate per patient × organism × specimen type per analysis period. Apply this in every resistance-% calculation. (Explained in §11.)
+- [x] **DATA-03 (M)** **Hospital-acquired flag:** inpatient sample taken on day ≥ 3 after `admission_date`, i.e. `sample_date − admission_date ≥ 2` days, with the admission day counted as day 1. Convention to be confirmed (§10.1).
+- [~] **DATA-04 (M)** **Time windows** relative to the as-of date: rolling last 4 weeks, rolling last 12 months, calendar year, and an arbitrary custom range.
 - [ ] **DATA-05 (M)** **Incremental ingestion:** new rows can be appended and only affected aggregates recomputed. Architected like a live feed from the lab information system (Mylab).
-- [ ] **DATA-06 (M)** Respect reporting rules: urine-only antibiotics (MEC, TMP, NIT) only for urine specimens.
-- [ ] **DATA-07 (M)** **Intrinsic resistance table** (EUCAST Expected Resistant Phenotypes), e.g. Klebsiella–ampicillin, Proteus–nitrofurantoin. Show these as "intrinsically resistant", never as alerts or as "100 % resistance" findings.
+- [x] **DATA-06 (M)** Respect reporting rules: urine-only antibiotics (MEC, TMP, NIT) only for urine specimens.
+- [x] **DATA-07 (M)** **Intrinsic resistance table** (EUCAST Expected Resistant Phenotypes), e.g. Klebsiella–ampicillin, Proteus–nitrofurantoin. Show these as "intrinsically resistant", never as alerts or as "100 % resistance" findings.
 - [ ] **DATA-08 (C)** Optional national reference values (THL Finres) as a "Finland level" comparison line.
 
 ### 4.2 Statistical honesty (STAT)
-- [ ] **STAT-01 (M)** Minimum-sample rule: a resistance % is shown as a headline number only when n ≥ 30 first isolates. Below that the cell shows an explicit "insufficient data" state, plus counts.
-- [ ] **STAT-02 (M)** ❓ **Confidence intervals:** every % comes with a 95 % interval (e.g. Wilson), displayed visually (range bar / tooltip).
-- [ ] **STAT-03 (M)** ❓ **Show counts, not just %:** e.g. "7 / 11 resistant" alongside or instead of a percentage when n is small.
-- [ ] **STAT-04 (M)** ❓ **Automatic fallback to a broader group:** when ward-level data is too thin, fall back along a hierarchy (ward → hospital or primary care → all), and **clearly label** which level is shown.
-- [ ] **STAT-05 (S)** ❓ **Fallback to the annual figure:** when the 4-week number is unreliable, show the 12-month number as the main value and the 4-week one as a secondary signal.
+- [x] **STAT-01 (M)** Minimum-sample rule: a resistance % is shown as a headline number only when n ≥ 30 first isolates. Below that the cell shows an explicit "insufficient data" state, plus counts.
+- [x] **STAT-02 (M)** ❓ **Confidence intervals:** every % comes with a 95 % interval (e.g. Wilson), displayed visually (range bar / tooltip).
+- [x] **STAT-03 (M)** ❓ **Show counts, not just %:** e.g. "7 / 11 resistant" alongside or instead of a percentage when n is small.
+- [x] **STAT-04 (M)** ❓ **Automatic fallback to a broader group:** when ward-level data is too thin, fall back along a hierarchy (ward → hospital or primary care → all), and **clearly label** which level is shown.
+- [x] **STAT-05 (S)** ❓ **Fallback to the annual figure:** when the 4-week number is unreliable, show the 12-month number as the main value and the 4-week one as a secondary signal.
 - [ ] **STAT-06 (S)** ❓ **Shrinkage (smoothing) estimate:** blend a small ward-level number toward the broader-group number, weighted by sample size. Gives a single, more stable "best estimate". Check with the mentor (§10.1).
-- [ ] **STAT-07 (M)** **Stratification:** all dimensions are available as filters (dynamic). Clinically known splits are **on by default**: urine E. coli by **sex** (men have ~2× ciprofloxacin resistance), in/outpatient, hospital-acquired vs community.
+- [~] **STAT-07 (M)** **Stratification:** all dimensions are available as filters (dynamic). Clinically known splits are **on by default**: urine E. coli by **sex** (men have ~2× ciprofloxacin resistance), in/outpatient, hospital-acquired vs community.
 - [ ] **STAT-08 (S)** Multiple-testing awareness in alerting: control false alarms when testing many ward × organism × antibiotic combinations (e.g. false-discovery-rate correction, minimum-n gates).
 - [ ] **STAT-09 (M)** **Automatic subgroup-difference discovery (important):** test each dimension (sex, age band, home area, ward type, hospital-acquired, …) for significant resistance differences and surface "resistance differs notably by X". The general-method counterpart of STAT-07's defaults: it should rediscover the known sex effect by itself. Uses STAT-08 to keep false discoveries down.
 
@@ -148,21 +148,21 @@ All detectors run automatically on every update (or as-of change) with general m
 - [ ] **NOTIF-06 (S)** Alert triage workflow: new → investigating → confirmed / dismissed, with dismissed alerts suppressing duplicates.
 
 ### 4.5 Views & usability (VIEW)
-- [ ] **VIEW-01 (M)** V1 My Ward, as described in §3, with 4-week and 12-month side by side. **Visual quality is a priority.**
-- [ ] **VIEW-02 (M)** Filters on dataset parameters: ward, ward type (in/out), institution, specimen, organism, antibiotic, sex, age band, hospital-acquired, period.
+- [~] **VIEW-01 (M)** V1 My Ward, as described in §3, with 4-week and 12-month side by side. **Visual quality is a priority.**
+- [~] **VIEW-02 (M)** Filters on dataset parameters: ward, ward type (in/out), institution, specimen, organism, antibiotic, sex, age band, hospital-acquired, period.
 - [ ] **VIEW-03 (M)** V3 Alert inbox and V4 Alert detail.
 - [ ] **VIEW-04 (S)** V2 Therapy-helper mode inside V1 (❓ see "weighted syndromic antibiogram" in §11).
 - [ ] **VIEW-05 (S)** V5 Ward × time heatmap.
 - [ ] **VIEW-06 (M)** V6 Trend explorer, with threshold lines and year-vs-year comparison.
 - [ ] **VIEW-07 (M)** V7 Data quality / feed status.
 - [ ] **VIEW-08 (S)** Role-based entry: choose one of the 3 roles → land on that role's home view.
-- [ ] **VIEW-09 (S)** Clinician-first UX: core answer reachable in ≤ 2 clicks, readable on a tablet or phone, plain-language labels, consistent colour meaning (green = likely effective, red = high resistance, grey = insufficient data).
+- [~] **VIEW-09 (S)** Clinician-first UX: core answer reachable in ≤ 2 clicks, readable on a tablet or phone, plain-language labels, consistent colour meaning (green = likely effective, red = high resistance, grey = insufficient data).
 - [ ] **VIEW-10 (C)** Finnish / English language toggle (the data already contains Finnish names). Optional.
 - [ ] **VIEW-11 (C)** Export: annual report (PDF/CSV).
-- [ ] **VIEW-12 (M)** **Data-freshness badge on every view** (e.g. "PHC-S: last sample 7 days ago ⚠") so "no data" is never mistaken for "no resistance".
+- [~] **VIEW-12 (M)** **Data-freshness badge on every view** (e.g. "PHC-S: last sample 7 days ago ⚠") so "no data" is never mistaken for "no resistance".
 
 ### 4.6 Continuous updating & replay (LIVE)
-- [ ] **LIVE-01 (M)** **Global as-of date (time cursor):** every view and every detector computes as if "today" were that date, using only data up to it.
+- [x] **LIVE-01 (M)** **Global as-of date (time cursor):** every view and every detector computes as if "today" were that date, using only data up to it.
 - [ ] **LIVE-02 (M)** **Replay mode:** play data forward day by day (adjustable speed); views and alerts update live, with animated transitions; alerts appear at the moment they would have fired.
 - [ ] **LIVE-03 (C)** "What's new since last visit" summary for the user. Optional.
 - [ ] **LIVE-04 (S)** Jump-to-event shortcuts for the demo (start replay just before each validation event in §8).
@@ -174,10 +174,10 @@ All detectors run automatically on every update (or as-of change) with general m
 - [ ] **AI-04 (M if AI is used)** Guardrails: the AI only cites numbers the statistics engine computed (no invented figures), shows its sources, and is labelled as decision support.
 
 ### 4.8 Non-functional (NF)
-- [ ] **NF-01 (M)** Views respond in < 2 s on the full dataset.
-- [ ] **NF-02 (M)** Runs locally for the demo with no internet dependency (except optional AI).
+- [~] **NF-01 (M)** Views respond in < 2 s on the full dataset.
+- [~] **NF-02 (M)** Runs locally for the demo with no internet dependency (except optional AI).
 - [ ] **NF-03 (S)** Privacy by design: prescriber views show aggregates only; patient-level line lists only in infection-control / lab roles and patient-context API calls. The data is synthetic, but design as if it were real.
-- [ ] **NF-04 (S)** Detection thresholds are configurable, not magic numbers in code.
+- [~] **NF-04 (S)** Detection thresholds are configurable, not magic numbers in code.
 
 ### 4.9 Patient-level risk & spread (PAT)
 The mentor's "grandma" story: a carrier moves Loimaa hospital → Tyks → nursing home and spreads
@@ -201,7 +201,7 @@ directions:
 - **Push:** we send events, such as "patient X is a flagged carrier" or a new alert, to the other system's endpoint.
 
 The UI itself is a client of the same API.
-- [ ] **API-01 (M)** REST API exposing the same statistics and alerts the UI uses.
+- [~] **API-01 (M)** REST API exposing the same statistics and alerts the UI uses.
 - [ ] **API-02 (M)** **Prescribing context (pull,** `order-select` **style):** given ward + infection/specimen type (+ sex, age) and optionally the chosen antibiotic → resistance summary and active alerts as cards. E.g. "Ciprofloxacin: 25 % resistance in URO E. coli, last 4 weeks; active ESBL cluster on this ward."
 - [ ] **API-03 (M)** **Patient context (pull,** `patient-view` **style):** given a patient id → carrier flags and relevant alerts. E.g. "Known ESBL carrier (positive 2025-06, URO). Use contact precautions."
 - [ ] **API-04 (M)** **Push / webhooks:** send new alerts and new carrier flags to registered external endpoints, e.g. a mock "Tyks" receiver. Implements NOTIF-05.
@@ -303,6 +303,11 @@ exactly why STAT-08 matters.
 | 2026-10-17 | We may plant our own scenarios in extension data (§4.11). |
 | 2026-10-17 | "Beyond antibiotics" (§4.12) shelved. |
 | 2026-10-17 | Varha angle is TBA / parked (§1). |
+| 2026-10-17 | First-isolate rule is applied **within the analysed stratum and window** (e.g. per ward), the CLSI M39 convention for unit-specific antibiograms. A patient sampled on GER and URO counts once on each ward and once hospital-wide. |
+| 2026-10-17 | Fallback hierarchy (STAT-04): ward → institution (all hospital wards / all health centres) → all locations. V1 cells show the ward's 4-week value (counts if n < 30) next to the 12-month value at the most specific level with n ≥ 30, marked H / P / A when it fell back. STAT-06 shrinkage not built (waiting on mentor). |
+| 2026-10-17 | Traffic light: green < 10 %, amber 10–20 %, red ≥ 20 % (config). Intrinsic pairs show as hatched "Intrinsic R". |
+| 2026-10-17 | Data freshness (VIEW-12) uses a per-ward Poisson silence test: with λ samples/day over the last 8 weeks, d silent days are flagged when exp(−λd) < 0.01 (delayed) or < 0.001 (stale). Busy wards flag after 1 day, ICU after ~3–4. Basis for ANOM-04. |
+| 2026-10-17 | Build in 5 slices (§12). |
 
 ## 10. To-do & open questions
 
@@ -363,3 +368,16 @@ that visible and safe.
   know *which* organism it is. This answers "what fraction of this ward's UTIs would
   antibiotic X cover?" by weighting each organism's susceptibility by how often that organism
   causes UTIs there. That is exactly the question asked at the bedside.
+
+---
+
+## 12. Implementation slices
+Work is split into vertical slices, one commit series each. Update the status here.
+
+| # | Slice | Main requirements | Status |
+|---|---|---|---|
+| 1 | Data layer + statistics engine + V1 My Ward | DATA-01–04, 06, 07 · STAT-01–05 · LIVE-01 · VIEW-01/02/12 (core) · API `/meta`, `/antibiogram`, `/freshness` | done |
+| 2 | Detectors + alerts | NOTIF-01/02/04/06 · ANOM-01, 02, 04, 06, 08 · STAT-08 · V3 inbox, V4 detail, V1 alert strip, V7 feed status | next |
+| 3 | Replay, trends, discovery | LIVE-02/04 · ANOM-03, 07 · V6 trends, V5 heatmap · STAT-07 defaults, STAT-09 · DATA-05 incremental | |
+| 4 | Patients + integration | PAT-01–03 · API-02–05 · NOTIF-03/05 · V2 therapy helper · V10 spread · V11 mock EHR · ANOM-05/09 | |
+| 5 | AI + polish | AI-01–04 · VIEW-08 roles · EXT-* · README, demo presets | |

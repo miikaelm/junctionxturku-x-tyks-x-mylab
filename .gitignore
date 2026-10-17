@@ -8,6 +8,7 @@ __pycache__/
 # Node
 node_modules/
 dist/
+*.tsbuildinfo
 
 # Env / OS / editors
 .env
