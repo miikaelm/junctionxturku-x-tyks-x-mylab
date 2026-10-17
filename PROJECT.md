@@ -48,7 +48,7 @@ filterable by dataset parameters.
 - Data is clean (no orphans, duplicates or inconsistencies). Finnish + English names available.
 - External EARS-Net / THL data: **optional**, reference only (see DATA-08).
 
-### Context: Varha (**TBA**, parked until the usability phase; see UX-01)
+### Context: Varha (design decided 2026-10-17, see UX-01 and §9)
 The mentor framed things from the **Varha** angle (*Varsinais-Suomen hyvinvointialue*, the
 wellbeing services county of Southwest Finland). Since 2023 it has run public health, social
 and rescue services for ~490,000 residents in 27 municipalities: Tyks, regional hospitals
@@ -228,18 +228,28 @@ results × grouping dimensions × detectors → alerts + API). Antibiotic resist
 ### 4.13 Usability optimization phase (UX) *(proposed)*
 Comes **after** the base features (slices 1–4 are built function-first with simple visuals, see §12).
 This phase reworks *how* the data is presented, per role. Decide the approach before building.
-- [ ] **UX-01 (S)** **Varha angle: figure out first, then build.** How the tool works at the scale of
+- [x] **UX-01 (S)** **Varha angle: figure out first, then build.** How the tool works at the scale of
   the wellbeing services county (§1): which levels exist (Varha area → institution / hospital → ward),
   whether we need extension data (EXT-02) to show more than one hospital, and how the pitch positions
-  it (mentor question in §10.1). Output: a design decision in §9 before any code.
+  it (mentor question in §10.1). Output: a design decision in §9 before any code. **Decided, see §9.**
 - [ ] **UX-02 (S)** **Exceptions-first view for infection control (R2):** open on what is abnormal
-  (active alerts, red cells, significant shifts) instead of the full antibiogram. Normal / green data
-  stays reachable one step deeper or further down the page ("show all stats"), not up front.
-- [ ] **UX-03 (S)** **Drill-down hierarchy for big-picture users (R2, R3):** Varha area → institution
-  (hospital / health centres) → ward. Each level shows its own overall resistance figures plus a summary
-  per child (e.g. per ward: number of red cells, active alerts, feed status); clicking a child drills
-  down. Must feel intuitive. The STAT-04 fallback chain (ward → institution → all) already matches
-  these levels; Varha would sit above "all".
+  instead of the full antibiogram. An *anomaly* is an active alert or a feed problem; chronic red cells
+  are not anomalies (they go to the ward's "avoid" list, UX-05). Normal data stays reachable one step
+  deeper ("show all"), not up front. The anomaly *is* the alert: clicking it opens V4.
+- [ ] **UX-03 (S)** **Drill-down hierarchy for big-picture users (R2, R3):** Varha → institution (Tyks,
+  PHC-N, PHC-S) → ward. Higher levels show **counts of anomalies, never an overall resistance %**, and
+  list only the children that have anomalies, plus one quiet line naming the calm ones ("4 wards calm:
+  …"). Clicking a child drills down; same page template at every level. Other Varha hospitals appear as
+  greyed placeholders ("not in demo data"). Home area is a separate community lens, not a level.
+- [ ] **UX-05 (S)** **Clinician exceptions view (R1):** My Ward opens on what *not* to use and what is
+  going on on the ward, nothing else up front. Each "avoid" line: agent, infection, % resistant with n
+  (e.g. 40/130), **since when** above the threshold, and direction (rising / stable / easing). Based on
+  resistance in the organisms the agent targets, not on WISCA coverage. Ward alerts (clusters etc.) with
+  since when and what to do; known carriers sampled as a quiet count. The ranked therapy helper and full
+  antibiogram move further down. No badge, no notifications for clinicians.
+- [ ] **UX-06 (S)** **Notifications as delivery settings:** alerts are the first-party object in the
+  app; notifications are only how people hear about them outside it. The Notifications page moves from
+  the main nav to a settings (⚙) entry (subscriptions, channels, delivery log, digest).
 - [ ] **UX-04 (S)** **Visual polish pass:** consistent look across all views, animations, responsive
   layouts, role-specific landing pages (with VIEW-08). V1 got an early polish in slice 1.
 
@@ -387,6 +397,10 @@ E. faecalis (~10 %) is never tested for most agents and counts as not covered.
 | 2026-10-17 | **API-02/03 CDS Hooks:** discovery at `GET /api/cds-services`; `aei-antibiotic-choice` (order-select) and `aei-patient-context` (patient-view) return standard cards (summary, indicator, detail, source, links). The context takes plain fields (ward, infection, sex, age, antibiotic) next to `patientId` and a FHIR `draftOrders` bundle; `as_of` as a query parameter keeps replay consistent. |
 | 2026-10-17 | **NOTIF-03/05, API-04 delivery:** subscriptions (role, wards, minimum severity, types, routine on/off, events alert / carrier_flag / digest, channel webhook / email / Teams) in `backend/.state/subscriptions.json`, seeded with five demo recipients. Messages derive from the alert timeline, so the notifications view shows what was sent up to the time cursor (replay-consistent). Live delivery happens on ingest: webhooks are real HTTP POSTs (the mock patient record's inbox receives them); email and Teams are simulated (logged). Weekly digest on Mondays. |
 | 2026-10-17 | **Alert chart window:** an alert's chart now ends 4 weeks after its last signal (or at as-of), so an old alert shows its own period instead of the weeks before today. |
+| 2026-10-17 | **UX-01 Varha hierarchy:** one main hierarchy by where the sample was taken: Varha → institution → ward → (existing) cell / alert / cases / patient. Lab & stewardship land on Varha, infection control on Tyks, clinicians stay on their ward. In the demo Varha = Tyks + PHC-N + PHC-S; PHC-N and PHC-S are separate institutions here (the STAT-04 fallback still groups them). Other Varha hospitals (Loimaa, Vakka-Suomi, Salo) are greyed placeholders labelled "not in demo data": shows the scale without inventing results; levels are data-driven so real hospitals would fill in. No extension data needed. Schematic layout, no real map. Home area is a community lens on the Varha page, not a level. Three roles stay (no separate Varha-management role). |
+| 2026-10-17 | **UX-02/03 anomalies only:** overview pages show anomalies, not everything. Anomaly = active alert (new or ongoing, any type) or feed problem (delayed / stale / data gap). Chronic red cells are *not* anomalies (they would keep every count non-zero). Higher levels show anomaly counts per child, never an overall resistance % (averages hide a 30 % ward inside a 9 % hospital). Children without anomalies collapse into one line naming them, so "calm" is never confused with "no data". Colour means action: only anomalies get colour, normal is quiet grey. |
+| 2026-10-17 | **UX-05 clinician view = what not to use:** prescribers already know what they want; they need to know when *not* to use it. The "avoid" list comes from per-organism resistance (cells above the threshold for the infection's main organisms), not WISCA coverage, because untested E. faecalis caps UTI coverage near 90 % for nearly every agent. Each line carries since when, direction and n. In the moment of prescribing, the CDS order-select hook (API-02) does the same in the patient record. |
+| 2026-10-17 | **UX-06 notifications demoted:** alerts are first-party (inbox, overview, detail); notifications are delivery (email / Teams / webhook) and live under settings. Clinicians lose the badge and the alert strip; their ward's alerts appear inside the exceptions list. Infection-control nav becomes Overview (home) · Alerts · Spread · Carriers · ⚙. |
 
 ## 10. To-do & open questions
 
@@ -400,12 +414,12 @@ E. faecalis (~10 %) is never tested for most agents and counts as not covered.
 - [x] ~~"Bacteria not seen for 20 minutes": what time scale?~~ Resolved: years (see ANOM-08).
 - [ ] How is carrier status (MRSA/ESBL risk information) handled in patient records today? Would they prefer we push carrier flags to their system, or that their system queries ours (API-03/04)? (Both are built.) When is a flag cleared, and do health centres need carrier alerts too?
 - [ ] Therapy helper: which agents are reserve agents locally, and should untested organisms (E. faecalis) count as not covered?
-- [ ] Varha scope: should the pitch position the tool as Varha-wide (all hospitals, health centres, elderly care), or Tyks-only?
+- [ ] Varha scope: should the pitch position the tool as Varha-wide (all hospitals, health centres, elderly care), or Tyks-only? (Our default, §9 UX-01: Varha-ready, demo shows Tyks + 2 health centres with other hospitals as placeholders.)
 
 **Team:**
 - [x] Choose the tech stack: React + FastAPI (§9).
 - [ ] Decide which remaining *(proposed)* requirements (EXT) to commit to, and set their priorities.
-- [ ] Figure out how the Varha angle should work in the tool before building anything for it (UX-01).
+- [x] Figure out how the Varha angle should work in the tool before building anything for it (UX-01, decided in §9).
 
 ### 10.2 Open questions
 - Hackathon timeline and submission format?
@@ -461,5 +475,5 @@ Work is split into vertical slices, one commit series each. Update the status he
 | 2 | Detectors + alerts | NOTIF-01/02/04/06 · ANOM-01, 02, 04, 06, 08 · STAT-08 · V3 inbox, V4 detail, V1 alert strip, V7 feed status | done |
 | 3 | Replay, trends, discovery | LIVE-02/04 · ANOM-03, 07 · V6 trends, V5 heatmap · STAT-07 defaults, STAT-09 · DATA-05 incremental | done |
 | 4 | Patients + integration | PAT-01–03 · API-02–05 · NOTIF-03/05 · V2 therapy helper · V10 spread · V11 mock EHR · ANOM-05/09 · VIEW-08 roles (moved up from slice 5) | done |
-| 5 | Usability optimization | UX-01–04 (Varha design, exceptions-first view, drill-down, visual polish) · role landing pages polish · VIEW-09 | next |
+| 5 | Usability optimization | UX-02–06 (exceptions-first overview, Varha drill-down, clinician "avoid" view, notifications to settings, visual polish; UX-01 design decided) · role landing pages polish · VIEW-09 | next |
 | 6 | AI, extension data, delivery | AI-01–04 · EXT-* · README, demo presets | |
