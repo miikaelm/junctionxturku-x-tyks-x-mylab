@@ -110,7 +110,7 @@ Three primary roles (keep it to ~3; confirm with the mentor, see §10.1).
 - [x] **DATA-02 (M)** ❓ **First-isolate rule:** count only the first isolate per patient × organism × specimen type per analysis period. Apply this in every resistance-% calculation. (Explained in §11.)
 - [x] **DATA-03 (M)** **Hospital-acquired flag:** inpatient sample taken on day ≥ 3 after `admission_date`, i.e. `sample_date − admission_date ≥ 2` days, with the admission day counted as day 1. Convention to be confirmed (§10.1).
 - [~] **DATA-04 (M)** **Time windows** relative to the as-of date: rolling last 4 weeks, rolling last 12 months, calendar year, and an arbitrary custom range.
-- [ ] **DATA-05 (M)** **Incremental ingestion:** new rows can be appended and only affected aggregates recomputed. Architected like a live feed from the lab information system (Mylab).
+- [x] **DATA-05 (M)** **Incremental ingestion:** new rows can be appended and only affected aggregates recomputed. Architected like a live feed from the lab information system (Mylab).
 - [x] **DATA-06 (M)** Respect reporting rules: urine-only antibiotics (MEC, TMP, NIT) only for urine specimens.
 - [x] **DATA-07 (M)** **Intrinsic resistance table** (EUCAST Expected Resistant Phenotypes), e.g. Klebsiella–ampicillin, Proteus–nitrofurantoin. Show these as "intrinsically resistant", never as alerts or as "100 % resistance" findings.
 - [ ] **DATA-08 (C)** Optional national reference values (THL Finres) as a "Finland level" comparison line.
@@ -122,20 +122,20 @@ Three primary roles (keep it to ~3; confirm with the mentor, see §10.1).
 - [x] **STAT-04 (M)** ❓ **Automatic fallback to a broader group:** when ward-level data is too thin, fall back along a hierarchy (ward → hospital or primary care → all), and **clearly label** which level is shown.
 - [x] **STAT-05 (S)** ❓ **Fallback to the annual figure:** when the 4-week number is unreliable, show the 12-month number as the main value and the 4-week one as a secondary signal.
 - [ ] **STAT-06 (S)** ❓ **Shrinkage (smoothing) estimate:** blend a small ward-level number toward the broader-group number, weighted by sample size. Gives a single, more stable "best estimate". Check with the mentor (§10.1).
-- [~] **STAT-07 (M)** **Stratification:** all dimensions are available as filters (dynamic). Clinically known splits are **on by default**: urine E. coli by **sex** (men have ~2× ciprofloxacin resistance), in/outpatient, hospital-acquired vs community.
+- [x] **STAT-07 (M)** **Stratification:** all dimensions are available as filters (dynamic). Clinically known splits are **on by default**: urine E. coli by **sex** (men have ~2× ciprofloxacin resistance), in/outpatient, hospital-acquired vs community.
 - [x] **STAT-08 (S)** Multiple-testing awareness in alerting: control false alarms when testing many ward × organism × antibiotic combinations (e.g. false-discovery-rate correction, minimum-n gates).
-- [ ] **STAT-09 (M)** **Automatic subgroup-difference discovery (important):** test each dimension (sex, age band, home area, ward type, hospital-acquired, …) for significant resistance differences and surface "resistance differs notably by X". The general-method counterpart of STAT-07's defaults: it should rediscover the known sex effect by itself. Uses STAT-08 to keep false discoveries down.
+- [x] **STAT-09 (M)** **Automatic subgroup-difference discovery (important):** test each dimension (sex, age band, home area, ward type, hospital-acquired, …) for significant resistance differences and surface "resistance differs notably by X". The general-method counterpart of STAT-07's defaults: it should rediscover the known sex effect by itself. Uses STAT-08 to keep false discoveries down.
 
 ### 4.3 Anomaly detection (ANOM): four core anomaly types + novelty
 All detectors run automatically on every update (or as-of change) with general methods and configurable thresholds.
 
 - [x] **ANOM-01 (M) Outbreak / cluster of resistant cases.** Counts of a phenotype (MRSA, ESBL, …) per ward per week rise above that ward's expected baseline. Methods: Poisson/negative-binomial baseline, CUSUM, or CDC EARS C1–C3 / Farrington-style. Prioritise hospital-acquired cases.
 - [x] **ANOM-02 (M) Sudden resistance-rate shift.** The resistance % for an organism–antibiotic pair on a ward (last 4 weeks) differs significantly from its baseline (previous 12 months). Methods: binomial / Fisher exact test, CUSUM on proportions, minimum-n gate.
-- [ ] **ANOM-03 (M) Slow drift / long-term trend.** Gradual increase over months or years. Methods: logistic regression on time, Mann-Kendall or Cochran-Armitage trend test. Also flags **threshold crossings** (e.g. empirical agent passing the commonly used **20 % resistance** limit). This is the stewardship workflow (V6), not a daily alert.
+- [x] **ANOM-03 (M) Slow drift / long-term trend.** Gradual increase over months or years. Methods: logistic regression on time, Mann-Kendall or Cochran-Armitage trend test. Also flags **threshold crossings** (e.g. empirical agent passing the commonly used **20 % resistance** limit). This is the stewardship workflow (V6), not a daily alert.
 - [x] **ANOM-04 (M) Data-quality gap.** Sample volume per ward per day/week far below expected, or zero for several days. Distinguish "no resistance" from "no data". Shown in V7 and as the freshness badge / warning on affected views.
 - [ ] **ANOM-05 (S)** Cluster evidence: similarity of resistance profiles between cases in a cluster (same antibiogram pattern → likely same strain).
 - [x] **ANOM-06 (S)** Each alert records **why** it fired (observed vs expected, method, p-value or score) for display in V4 and for the AI explanation.
-- [ ] **ANOM-07 (S)** Measure **detection latency** on replay: days from event start to first alert.
+- [x] **ANOM-07 (S)** Measure **detection latency** on replay: days from event start to first alert.
 - [x] **ANOM-08 (S)** **Novelty alert ("not seen here for a long time / ever"):** a phenotype (MRSA/ESBL/VRE/CPE) or rare organism appears on a ward where it hasn't been seen for a configurable period, or never before. The mentor's example was "not seen in 20 years"; our data covers only 3 years, so the longest possible lookback is "first since records began". Fires on the *first* case, before outbreak statistics can. Skip common organisms to avoid noise.
 - [ ] **ANOM-09 (S)** **Multi-ward signal:** the same phenotype with a similar resistance profile appears on ≥ 2 wards within a configurable window. Flags possible spread for infection control without claiming direction ("seen on URO and GER"), and feeds V10.
 
@@ -152,8 +152,8 @@ All detectors run automatically on every update (or as-of change) with general m
 - [~] **VIEW-02 (M)** Filters on dataset parameters: ward, ward type (in/out), institution, specimen, organism, antibiotic, sex, age band, hospital-acquired, period.
 - [x] **VIEW-03 (M)** V3 Alert inbox and V4 Alert detail.
 - [ ] **VIEW-04 (S)** V2 Therapy-helper mode inside V1 (❓ see "weighted syndromic antibiogram" in §11).
-- [ ] **VIEW-05 (S)** V5 Ward × time heatmap.
-- [ ] **VIEW-06 (M)** V6 Trend explorer, with threshold lines and year-vs-year comparison.
+- [x] **VIEW-05 (S)** V5 Ward × time heatmap.
+- [x] **VIEW-06 (M)** V6 Trend explorer, with threshold lines and year-vs-year comparison.
 - [x] **VIEW-07 (M)** V7 Data quality / feed status.
 - [ ] **VIEW-08 (S)** Role-based entry: choose one of the 3 roles → land on that role's home view.
 - [~] **VIEW-09 (S)** Clinician-first UX: core answer reachable in ≤ 2 clicks, readable on a tablet or phone, plain-language labels, consistent colour meaning (green = likely effective, red = high resistance, grey = insufficient data).
@@ -163,9 +163,9 @@ All detectors run automatically on every update (or as-of change) with general m
 
 ### 4.6 Continuous updating & replay (LIVE)
 - [x] **LIVE-01 (M)** **Global as-of date (time cursor):** every view and every detector computes as if "today" were that date, using only data up to it.
-- [ ] **LIVE-02 (M)** **Replay mode:** play data forward day by day (adjustable speed); views and alerts update live, with animated transitions; alerts appear at the moment they would have fired.
+- [x] **LIVE-02 (M)** **Replay mode:** play data forward day by day (adjustable speed); views and alerts update live, with animated transitions; alerts appear at the moment they would have fired.
 - [ ] **LIVE-03 (C)** "What's new since last visit" summary for the user. Optional.
-- [ ] **LIVE-04 (S)** Jump-to-event shortcuts for the demo (start replay just before each validation event in §8).
+- [x] **LIVE-04 (S)** Jump-to-event shortcuts for the demo (start replay just before each validation event in §8).
 
 ### 4.7 AI layer (AI): optional angle, via OpenRouter
 - [ ] **AI-01 (S)** Natural-language query, e.g. "80-year-old man, UTI, Geriatrics — what works?" → answered from the tool's computed statistics (V2 logic), with the numbers shown.
@@ -314,6 +314,19 @@ Alerts not in the answer key over 3 years: cluster MED-B ESBL 2024-09-19 (3 case
 same weeks as a MED-B E. coli TZP rate shift) and cluster MED-A ESBL 2025-04-19 (5 vs 0.7); 11 other
 novelty alerts (MRSA/ESBL first on a ward in ≥ 180 days). No false data-gap alerts.
 
+**Slice 3 results** (checked by `backend/tests/test_slice3.py`)
+
+| # | Result |
+|---|---|
+| E4 | Trend test (ANOM-03): the **only** significant trend among 527 location × specimen × organism × antibiotic series is all-locations urine E. coli TMP, +2.1 pp/year (q 0.003); the fitted line crosses 20 % in **2025 Q4**; calendar years 14 → 18 → 19 → 21 %. |
+| Sex effect | Subgroup discovery (STAT-09) finds urine E. coli CIP men 14 % vs women 6 % (q 3e-10) by itself, at all locations, hospital, primary care, URO and PHC-N. |
+| ANOM-07 | Detection latency from each alert's own onset (the earliest case it counted): E1 cluster 8 days after its first counted case (3 days after the answer key's 2025-06-04); E2 novelty 0 days, cluster 4 days; E3 1 day after the gap began; sentinels 0 days. Rate shifts read 20–27 days, because their onset is the first resistant case anywhere in the 4-week window. |
+
+Other slice-3 findings (not in the answer key): subgroup differences at all locations for urine E. coli
+TMP by onset (hospital-acquired 25 % vs 18 %) and in/outpatient (24 % vs 18 %), and for wound S. aureus
+CLI by ward (ICU 16 % vs ED 0 %). 11 upward crossings of 20 % in the last 12 months; only URO
+K. pneumoniae TMP (14 % → 32 %) has its whole interval above 20 %, the rest are within noise.
+
 ---
 
 ## 9. Decisions log
@@ -344,6 +357,14 @@ novelty alerts (MRSA/ESBL first on a ward in ≥ 180 days). No false data-gap al
 | 2026-10-17 | **ANOM-04 data gap** uses the freshness silence test plus a 7-day low-volume test, but alerts only at p < 1e-6 (the badge keeps 0.001/0.01): ~10,000 ward-days are tested and daily volumes are over-dispersed, so badge-level α would raise ~30 alerts that are ordinary dips. |
 | 2026-10-17 | **ANOM-08 novelty** covers MRSA and ESBL (gap ≥ 180 days, or never with ≥ 180 days of history) and organisms under 1 % of isolates (none currently). CPE/VRE are sentinels; their alert carries the same "first on this ward in N days" note instead of a second alert. Sentinel meropenem-R is limited to Enterobacterales (Pseudomonas has a 6 % background). |
 | 2026-10-17 | **Severity (NOTIF-04):** sentinel = critical, cluster = high, rate shift / novelty / data gap = medium. **Triage (NOTIF-06)** is stored in `backend/.state/triage.json` with the as-of date it was taken at and applies from that date on, so replaying earlier dates shows alerts as they were. Dismissing suppresses repeats of the same detector × ward × subject for 90 days. |
+
+| 2026-10-17 | **Replay (LIVE-02/04):** the cursor steps forward (1 day or 1 week) only once every open view has loaded the previous step, so the backend sets the pace. Alerts first raised during a step are listed under the replay bar, and replay can pause on them. "Jump to" lists every alert raised up to today (built from the alert history, not the answer key) and starts 7 days before its onset. |
+| 2026-10-17 | **ANOM-07 onset:** an alert's onset is the earliest case its first firing counted (cluster: first case in the 14-day window; rate shift: first resistant first isolate in the 4-week window; data gap: the day after the last sample; sentinel / novelty: the case itself). Detection latency = first alert − onset, shown on every alert. |
+| 2026-10-17 | **ANOM-03 trends:** Cochran–Armitage test over calendar quarters (first isolates per quarter; the current quarter runs to as-of) for every location (all, institutions, wards) × specimen × organism × antibiotic. Gates: ≥ 6 quarters, ≥ 100 isolates, ≥ 5 pp fitted change; BH FDR across all eligible series. The fitted line is the matching weighted least squares. Threshold crossings: last 12 months vs the 12 before against 20 %, n ≥ 30 in both, shown as within noise unless the 95 % CI is past the line. Trends live in V6, not the alert inbox. |
+| 2026-10-17 | **STAT-09 subgroups:** first isolates are taken once per scope and window, then compared across sex, age band, hospital-acquired, in/outpatient, home area and ward (when the scope has several). Levels need n ≥ 30; Fisher exact (2 levels) or chi-square, tested only when the spread is ≥ 5 pp; BH over every comparison with enough data. Shown under My Ward (12 months, the selected ward) and in V6. |
+| 2026-10-17 | **STAT-07 defaults:** only urine E. coli by sex is split by default (config `DEFAULT_SPLITS`). Any organism can be split by sex, age band, onset, in/outpatient or home area from a subgroup finding. Onset and in/outpatient are not split by default: STAT-09 surfaces them where they matter (e.g. TMP by onset, hospital-wide) instead of doubling every table. |
+| 2026-10-17 | **DATA-05 ingestion:** batches in the CSV schema (`POST /api/ingest`), validated as a whole (keys, references, S/R only); only new rows are joined; the alert engine keeps firings before the batch's earliest sample date and re-runs the detectors from there (tested equal to a full rebuild). "Today" is now the last sample received (`AEI_AS_OF` can pin it); clients poll `/api/status` and follow. `AEI_HOLD_BACK_FROM` holds data back at startup so the feed status page can receive it day by day (demo). |
+| 2026-10-17 | **V5 overview:** wards × weeks of new ESBL / MRSA / VRE / CPE cases, or a key resistance rate (EARS-Net-style indicators in config) per 4-week block or quarter, with % only at n ≥ 30. Cells are ringed where an alert was raised. |
 
 ## 10. To-do & open questions
 
@@ -415,7 +436,7 @@ Work is split into vertical slices, one commit series each. Update the status he
 |---|---|---|---|
 | 1 | Data layer + statistics engine + V1 My Ward | DATA-01–04, 06, 07 · STAT-01–05 · LIVE-01 · VIEW-01/02/12 (core) · API `/meta`, `/antibiogram`, `/freshness` | done |
 | 2 | Detectors + alerts | NOTIF-01/02/04/06 · ANOM-01, 02, 04, 06, 08 · STAT-08 · V3 inbox, V4 detail, V1 alert strip, V7 feed status | done |
-| 3 | Replay, trends, discovery | LIVE-02/04 · ANOM-03, 07 · V6 trends, V5 heatmap · STAT-07 defaults, STAT-09 · DATA-05 incremental | next |
-| 4 | Patients + integration | PAT-01–03 · API-02–05 · NOTIF-03/05 · V2 therapy helper · V10 spread · V11 mock EHR · ANOM-05/09 | |
+| 3 | Replay, trends, discovery | LIVE-02/04 · ANOM-03, 07 · V6 trends, V5 heatmap · STAT-07 defaults, STAT-09 · DATA-05 incremental | done |
+| 4 | Patients + integration | PAT-01–03 · API-02–05 · NOTIF-03/05 · V2 therapy helper · V10 spread · V11 mock EHR · ANOM-05/09 | next |
 | 5 | Usability optimization | UX-01–04 (Varha design, exceptions-first view, drill-down, visual polish) · VIEW-08 roles · VIEW-09 | |
 | 6 | AI, extension data, delivery | AI-01–04 · EXT-* · README, demo presets | |

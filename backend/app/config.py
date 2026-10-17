@@ -7,8 +7,14 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = Path(os.environ.get("AEI_DATA_DIR", ROOT_DIR / "synthetic_microbiology_dataset"))
 
-# Scenario "today": the default as-of date when a request doesn't set one (LIVE-01).
-DEFAULT_AS_OF = date.fromisoformat(os.environ.get("AEI_AS_OF", "2026-09-27"))
+# Scenario "today": the default as-of date when a request doesn't set one (LIVE-01). By default
+# it is the last sample date in the data, so it moves forward as new data is ingested (DATA-05).
+# AEI_AS_OF pins it to a fixed date instead.
+AS_OF_OVERRIDE = date.fromisoformat(v) if (v := os.environ.get("AEI_AS_OF")) else None
+
+# Simulated lab feed (DATA-05): with AEI_HOLD_BACK_FROM set, samples from that date on are held
+# back at startup and can be received day by day through the ingestion path, as from a live LIS.
+HOLD_BACK_FROM = date.fromisoformat(v) if (v := os.environ.get("AEI_HOLD_BACK_FROM")) else None
 
 # Surveillance rules (PROJECT.md §5)
 MIN_ISOLATES_FOR_PERCENT = 30
@@ -147,3 +153,47 @@ SEVERITY_ORDER = ["critical", "high", "medium", "low", "info"]
 DISMISS_SUPPRESS_DAYS = 90
 # How far back the inbox looks for resolved alerts when asked to include them.
 RESOLVED_LOOKBACK_DAYS = 90
+
+# --- Replay, trends and subgroups (slice 3) -------------------------------------------------
+
+# Replay (LIVE-04): "jump to event" starts this many days before the event's first case.
+REPLAY_LEAD_DAYS = 7
+
+# Slow drift (ANOM-03): Cochran–Armitage test for a linear trend in resistance over calendar
+# quarters (first isolates per quarter), for every location × specimen × organism × antibiotic.
+# Gates keep thin series out; FDR across all series tested (STAT-08).
+TREND_MIN_QUARTERS = 6  # quarters with at least one isolate
+TREND_MIN_TOTAL_N = 100
+TREND_MIN_CHANGE_PP = 5.0  # fitted change over the whole period, percentage points
+# Empirical-use threshold (PROJECT.md §5): a commonly used upper limit for choosing an
+# antibiotic empirically. Trend charts draw it; crossing it is reported as a finding.
+EMPIRICAL_THRESHOLD_PCT = 20.0
+
+# Subgroup-difference discovery (STAT-09): resistance compared across the levels of each
+# dimension (chi-square, or Fisher exact for two levels), first isolates in the window. Levels
+# with fewer than SUBGROUP_MIN_N isolates are left out. FDR across all comparisons (STAT-08).
+SUBGROUP_DIMENSIONS = {
+    "sex": "Sex",
+    "age_band": "Age band",
+    "hospital_acquired": "Hospital-acquired",
+    "ward_type": "Inpatient / outpatient",
+    "home_area": "Home area",
+    "ward_code": "Ward",
+}
+SUBGROUP_MIN_N = 30
+SUBGROUP_MIN_DIFF_PP = 5.0
+
+# Clinically known splits shown by default in My Ward (STAT-07): sub-rows for this organism
+# and specimen by this dimension (urine E. coli: men have about twice the CIP resistance).
+DEFAULT_SPLITS = [{"specimen": "urine", "organism": "Escherichia coli", "by": "sex"}]
+
+# Ward × time overview (V5): key resistance indicators offered next to the phenotype counts.
+# These follow the EARS-Net headline indicators (3rd-gen cephalosporin and fluoroquinolone
+# resistance in E. coli and K. pneumoniae, MRSA), adapted to the agents in this data.
+HEATMAP_KEY_RATES = [
+    {"specimen": "urine", "organism": "Escherichia coli", "antibiotic": "CRO"},
+    {"specimen": "urine", "organism": "Escherichia coli", "antibiotic": "CIP"},
+    {"specimen": "urine", "organism": "Escherichia coli", "antibiotic": "TMP"},
+    {"specimen": "urine", "organism": "Klebsiella pneumoniae", "antibiotic": "CRO"},
+    {"specimen": "wound", "organism": "Staphylococcus aureus", "antibiotic": "FOX"},
+]

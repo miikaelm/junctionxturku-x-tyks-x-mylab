@@ -3,7 +3,8 @@
 Every detector scans the whole timeline once and returns `Firing`s: "on day t, using only data
 up to t, this test was positive". Because no firing looks past its own day, the alerts at any
 as-of date are simply the firings up to that date (LIVE-01), so the timeline can be computed
-once and cached.
+once and cached. Detectors take `since`: evaluate only days from then on (after an ingest,
+earlier days are unchanged, DATA-05).
 """
 
 from dataclasses import dataclass, field
@@ -54,6 +55,11 @@ def day_index(ds: Dataset, dates: pd.Series) -> np.ndarray:
 
 def to_date(ds: Dataset, idx: int) -> date:
     return ds.start.date() + timedelta(days=int(idx))
+
+
+def first_index(ds: Dataset, since: date | None) -> int:
+    """Day index of `since` (0 when None): detectors skip evaluation days before it."""
+    return max(0, (since - ds.start.date()).days) if since else 0
 
 
 def n_days(ds: Dataset, horizon: date) -> int:

@@ -6,10 +6,10 @@ import { AlertList } from "./AlertBits";
 
 /** Active alerts for the selected ward or location, shown on My Ward (V1, NOTIF-02). */
 export function AlertStrip({ location }: { location: string }) {
-  const { asOf, alertsVersion } = useApp();
+  const { asOf, alertsVersion, meta } = useApp();
   const { data } = useFetch(
     (signal) => api.alerts({ as_of: asOf, location }, signal),
-    [asOf, location, alertsVersion],
+    [asOf, location, alertsVersion, meta.data_version],
   );
   if (!data) return null;
   const alerts = data.alerts.filter((a) => a.triage.status !== "dismissed");

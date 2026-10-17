@@ -36,9 +36,11 @@ def novelty_events(ds: Dataset, horizon: date) -> pd.DataFrame:
     return days_since_previous(events, ["ward_code", "item"], ds.start)
 
 
-def detect_novelty(ds: Dataset, horizon: date) -> list[Firing]:
+def detect_novelty(ds: Dataset, horizon: date, since: date | None = None) -> list[Firing]:
     events = novelty_events(ds, horizon)
     hits = events[events.gap_days >= NOVELTY_MIN_GAP_DAYS]
+    if since:
+        hits = hits[hits.sample_date >= pd.Timestamp(since)]
     firings = []
     for e in hits.itertuples(index=False):
         when = (

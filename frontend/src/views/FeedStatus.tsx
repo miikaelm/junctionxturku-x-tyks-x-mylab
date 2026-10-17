@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { api, type FeedWard } from "../api/client";
 import { AlertList } from "../components/AlertBits";
 import { addDays, daysAgo, fmtDate } from "../lib/format";
@@ -13,11 +14,11 @@ const STATUS_TEXT: Record<FeedWard["status"], string> = {
 
 /** V7 Data quality / feed status (ANOM-04, VIEW-12): is every ward's data arriving? */
 export function FeedStatus() {
-  const { asOf, alertsVersion } = useApp();
-  const feed = useFetch((signal) => api.feed(asOf, signal), [asOf]);
+  const { asOf, alertsVersion, meta } = useApp();
+  const feed = useFetch((signal) => api.feed(asOf, signal), [asOf, meta.data_version]);
   const gaps = useFetch(
     (signal) => api.alerts({ as_of: asOf, type: "data_gap", include_resolved: true }, signal),
-    [asOf, alertsVersion],
+    [asOf, alertsVersion, meta.data_version],
   );
 
   return (
@@ -29,6 +30,8 @@ export function FeedStatus() {
           <p className="ward-sub">Samples received per ward, last 8 weeks · as of {fmtDate(asOf)}</p>
         </div>
       </section>
+
+      <LabFeed />
 
       {feed.error && <p className="error">Could not load the feed status: {feed.error}</p>}
       {feed.data && (
@@ -102,5 +105,70 @@ function Spark({ ward }: { ward: FeedWard }) {
         );
       })}
     </svg>
+  );
+}
+
+/** Incremental ingestion (DATA-05): what has been received, the last batch, and (when the server
+ * holds data back) a button that receives the next day as a live lab feed would deliver it. */
+function LabFeed() {
+  const { meta, checkForData } = useApp();
+  const status = useFetch((signal) => api.status(signal), [meta.data_version]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const s = status.data;
+  const last = s?.last_ingest;
+
+  const receive = async (days: number) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.ingestHeldBack(days);
+      checkForData();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!s) return null;
+  return (
+    <section className="card pad lab-feed">
+      <h2>Lab feed</h2>
+      <p>
+        Data received through <strong>{fmtDate(s.data_end)}</strong> ({s.rows.cultures.toLocaleString("en")} cultures,
+        version {s.version}). New results are appended as they arrive; alerts are re-run only from the earliest sample
+        date in each batch.
+      </p>
+      {last && (
+        <p className="muted small">
+          Last batch {last.at.replace("T", " ")} from {last.source}: {last.rows.cultures} cultures, {last.rows.isolates}{" "}
+          isolates, {last.rows.susceptibility} results
+          {last.sample_dates && ` sampled ${fmtDate(last.sample_dates.from)}${last.sample_dates.to !== last.sample_dates.from ? ` – ${fmtDate(last.sample_dates.to)}` : ""}`}
+          ; recomputed from {last.recomputed_from ? fmtDate(last.recomputed_from) : "–"} in {last.seconds.total} s.
+        </p>
+      )}
+      {s.held_back ? (
+        <div className="triage-actions">
+          <button type="button" className="btn" disabled={busy} onClick={() => receive(1)}>
+            Receive next day
+          </button>
+          <button type="button" className="btn" disabled={busy} onClick={() => receive(7)}>
+            Receive next week
+          </button>
+          <span className="muted small">
+            Simulated feed: {s.held_back.days} days ({fmtDate(s.held_back.from)} – {fmtDate(s.held_back.to)}) held back
+            at startup.
+          </span>
+        </div>
+      ) : (
+        <p className="muted small">
+          Live ingestion: <span className="mono">POST /api/ingest</span> with new rows in the CSV schema. Start the
+          server with <span className="mono">AEI_HOLD_BACK_FROM=YYYY-MM-DD</span> to replay the end of the data as a
+          live feed.
+        </p>
+      )}
+      {err && <p className="error">{err}</p>}
+    </section>
   );
 }

@@ -16,10 +16,18 @@ from scipy.stats import poisson
 
 from app.config import FRESHNESS_RATE_LOOKBACK_DAYS, GAP_ALERT_ALPHA, GAP_VOLUME_WINDOW_DAYS
 from app.data.dataset import Dataset
-from app.detectors.common import Firing, cumulative, daily_counts, n_days, to_date, window_sums
+from app.detectors.common import (
+    Firing,
+    cumulative,
+    daily_counts,
+    first_index,
+    n_days,
+    to_date,
+    window_sums,
+)
 
 
-def detect_data_gaps(ds: Dataset, horizon: date) -> list[Firing]:
+def detect_data_gaps(ds: Dataset, horizon: date, since: date | None = None) -> list[Firing]:
     t = np.arange(n_days(ds, horizon))
     L, V = FRESHNESS_RATE_LOOKBACK_DAYS, GAP_VOLUME_WINDOW_DAYS
     firings = []
@@ -42,7 +50,7 @@ def detect_data_gaps(ds: Dataset, horizon: date) -> list[Firing]:
         p_low = poisson.cdf(observed, expected)
         low = (t - V - L + 1 >= 0) & (p_low < GAP_ALERT_ALPHA)
 
-        for i in np.flatnonzero(silence | low):
+        for i in np.flatnonzero((silence | low) & (t >= first_index(ds, since))):
             day = to_date(ds, i)
             if silence[i]:
                 title = f"No samples for {silent[i]} days (usually {rate[i]:.1f} per day)"

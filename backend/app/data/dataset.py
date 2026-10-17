@@ -5,12 +5,11 @@ Every downstream computation works on these frames. They are sorted by sample da
 """
 
 from dataclasses import dataclass
-from functools import lru_cache
 
 import pandas as pd
 
 from app.config import AGE_BANDS, HOSPITAL_ACQUIRED_MIN_DAYS
-from app.data.loader import Tables, get_tables
+from app.data.loader import Tables
 
 
 @dataclass(frozen=True)
@@ -42,48 +41,81 @@ def hospital_acquired(cultures: pd.DataFrame) -> pd.Series:
     return days.ge(HOSPITAL_ACQUIRED_MIN_DAYS).fillna(False).astype(bool)
 
 
-def build_dataset(tables: Tables) -> Dataset:
-    cultures = tables.cultures.merge(tables.patients, on="patient_id", how="left")
-    cultures["hospital_acquired"] = hospital_acquired(cultures)
-    cultures["age_band"] = age_band(cultures.age_years)
-    cultures = cultures.sort_values(["sample_date", "culture_id"], kind="stable")
-    cultures = cultures.reset_index(drop=True)
+CULTURE_COLS = [
+    "culture_id",
+    "patient_id",
+    "sample_date",
+    "ward_code",
+    "ward_type",
+    "institution",
+    "specimen",
+    "admission_date",
+    "hospital_acquired",
+    "age_years",
+    "age_band",
+    "sex",
+    "home_area",
+]
 
-    culture_cols = [
-        "culture_id",
-        "patient_id",
-        "sample_date",
-        "ward_code",
-        "ward_type",
-        "institution",
-        "specimen",
-        "admission_date",
-        "hospital_acquired",
-        "age_years",
-        "age_band",
-        "sex",
-        "home_area",
-    ]
-    isolates = tables.isolates.merge(cultures[culture_cols], on="culture_id", how="inner")
-    isolates = isolates.sort_values(["sample_date", "isolate_id"], kind="stable")
-    isolates = isolates.reset_index(drop=True)
 
-    ast = tables.susceptibility[["isolate_id", "organism", "antibiotic_code"]].copy()
-    ast["resistant"] = tables.susceptibility.result.eq("R")
+def _derive_cultures(cultures: pd.DataFrame, patients: pd.DataFrame) -> pd.DataFrame:
+    out = cultures.merge(patients, on="patient_id", how="left")
+    out["hospital_acquired"] = hospital_acquired(out)
+    out["age_band"] = age_band(out.age_years)
+    return out
 
-    tested = frozenset(
+
+def _derive_ast(susceptibility: pd.DataFrame) -> pd.DataFrame:
+    ast = susceptibility[["isolate_id", "organism", "antibiotic_code"]].copy()
+    ast["resistant"] = susceptibility.result.eq("R")
+    return ast
+
+
+def _by_date(df: pd.DataFrame, id_col: str) -> pd.DataFrame:
+    """Sorted by sample date, so drop_duplicates(keep="first") picks the earliest (DATA-02)."""
+    return df.sort_values(["sample_date", id_col], kind="stable").reset_index(drop=True)
+
+
+def _pairs(ast: pd.DataFrame) -> frozenset[tuple[str, str]]:
+    return frozenset(
         ast[["organism", "antibiotic_code"]].drop_duplicates().itertuples(index=False, name=None)
     )
+
+
+def build_dataset(tables: Tables) -> Dataset:
+    cultures = _by_date(_derive_cultures(tables.cultures, tables.patients), "culture_id")
+    isolates = tables.isolates.merge(cultures[CULTURE_COLS], on="culture_id", how="inner")
+    ast = _derive_ast(tables.susceptibility)
     return Dataset(
         cultures=cultures,
-        isolates=isolates,
+        isolates=_by_date(isolates, "isolate_id"),
         ast=ast,
         antibiotics=tables.antibiotics,
         wards=tables.wards,
-        tested_pairs=tested,
+        tested_pairs=_pairs(ast),
     )
 
 
-@lru_cache(maxsize=1)
+def extend_dataset(ds: Dataset, patients: pd.DataFrame, batch: Tables) -> Dataset:
+    """`ds` with a batch of new rows appended (DATA-05). Only the new rows are joined and
+    derived; existing rows are reused. New isolates may belong to cultures received earlier
+    (results arrive after the sample), so they join against all cultures."""
+    new_cultures = _derive_cultures(batch.cultures, patients)
+    cultures = _by_date(pd.concat([ds.cultures, new_cultures], ignore_index=True), "culture_id")
+    new_isolates = batch.isolates.merge(cultures[CULTURE_COLS], on="culture_id", how="inner")
+    new_ast = _derive_ast(batch.susceptibility)
+    return Dataset(
+        cultures=cultures,
+        isolates=_by_date(pd.concat([ds.isolates, new_isolates], ignore_index=True), "isolate_id"),
+        ast=pd.concat([ds.ast, new_ast], ignore_index=True),
+        antibiotics=ds.antibiotics,
+        wards=ds.wards,
+        tested_pairs=ds.tested_pairs | _pairs(new_ast),
+    )
+
+
 def get_dataset() -> Dataset:
-    return build_dataset(get_tables())
+    """The current dataset: everything received so far (see app/data/store.py)."""
+    from app.data.store import get_store  # the store builds on this module
+
+    return get_store().dataset

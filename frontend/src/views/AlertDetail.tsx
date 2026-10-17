@@ -9,8 +9,11 @@ import { useApp } from "../state/AppContext";
 
 /** V4 Alert detail / outbreak investigation: why it fired, timeline, cases, triage. */
 export function AlertDetailView({ id }: { id: string }) {
-  const { asOf, alertsVersion } = useApp();
-  const { data, error, loading } = useFetch((signal) => api.alert(id, asOf, signal), [id, asOf, alertsVersion]);
+  const { asOf, alertsVersion, meta } = useApp();
+  const { data, error, loading } = useFetch(
+    (signal) => api.alert(id, asOf, signal),
+    [id, asOf, alertsVersion, meta.data_version],
+  );
 
   return (
     <>
@@ -37,6 +40,11 @@ export function AlertDetailView({ id }: { id: string }) {
                 signal {fmtDate(data.last_seen)} ·{" "}
                 {data.state === "active" ? "active" : `resolved ${fmtDate(data.resolved_on!)}`} ·{" "}
                 <TriagePill alert={data} />
+              </p>
+              <p className="ward-sub muted small">
+                {data.detection_days > 0
+                  ? `Detected ${data.detection_days} day${data.detection_days > 1 ? "s" : ""} after ${data.type === "data_gap" ? "the gap began" : "the first case it counted"} (${fmtDate(data.onset)}).`
+                  : "Detected on the day of the case."}
               </p>
             </div>
           </section>

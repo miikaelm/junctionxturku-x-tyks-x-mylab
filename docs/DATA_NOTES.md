@@ -93,3 +93,16 @@ Our convention: first isolate is taken *within the analysed stratum and window* 
   barely changes cluster counts.
 - MRSA/ESBL "first on this ward in ≥ 180 days" happens ~12 times in 3 years (mostly MRSA on
   small wards).
+
+## Learned while building trends and subgroups (slice 3)
+- Quarterly first isolates, all locations, urine E. coli: ~700–900 per quarter; on a big ward ~60–100.
+  Of 527 series passing the trend gates, only all-locations urine E. coli TMP has a significant trend
+  (E4). The URO ESBL outbreak shows as a 2025 Q2 spike in URO CRO, but not as a trend.
+- 20 % crossings between consecutive 12-month windows are common at ward level and mostly noise
+  (11 upward as of 2026-09-27; only URO K. pneumoniae TMP 14 % → 32 % has its CI above 20 %).
+- Subgroup differences found with FDR at all locations (12 months to 2026-09-27): urine E. coli CIP by
+  sex (men 14 % vs women 6 %), urine E. coli TMP by onset (HA 25 % vs 18 %) and in/outpatient
+  (24 % vs 18 %), wound S. aureus CLI by ward (ICU 16 %, ED 0 %). Within a single ward only the
+  sex effect survives, and only where urine E. coli is plentiful (URO, PHC-N).
+- Ingesting one day (~40 cultures) takes ~0.5–1 s including the alert re-run, and the incremental
+  timeline equals a full rebuild exactly.

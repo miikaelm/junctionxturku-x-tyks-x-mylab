@@ -3,8 +3,13 @@ last 12 months (VIEW-01), with the place fallback (STAT-04) and time fallback (S
 
 Each cell carries the estimate at every level of the location hierarchy, so the client can
 show the most specific reliable number and explain what it fell back from.
+
+One organism can be split into sub-rows by a patient dimension (STAT-07), e.g. urine E. coli by
+sex by default (config.DEFAULT_SPLITS). Each sub-row is a full row for that subgroup, with its
+own fallbacks.
 """
 
+from dataclasses import dataclass, replace
 from datetime import date
 
 import pandas as pd
@@ -16,6 +21,17 @@ from app.data.intrinsic import is_intrinsic
 from app.data.scope import Scope
 from app.data.windows import Window
 from app.stats.proportions import estimate
+from app.stats.subgroups import value_label
+
+SPLIT_DIMENSIONS = ("sex", "age_band", "hospital_acquired", "ward_type", "home_area")
+
+
+@dataclass(frozen=True)
+class Split:
+    organism: str
+    by: str  # one of SPLIT_DIMENSIONS
+    default: bool = False  # applied by config, not asked for
+
 
 Counts = dict[tuple[str, str], tuple[int, int]]
 
@@ -36,7 +52,12 @@ def reported_antibiotics(ds: Dataset, specimen: str) -> pd.DataFrame:
     return abx[abx.reported_for.eq("all") | abx.reported_for.eq(specimen)]
 
 
-def build_antibiogram(ds: Dataset, scope: Scope, as_of: date) -> dict:
+def split_values(ds: Dataset, by: str) -> list:
+    values = ds.isolates[by].dropna().unique()
+    return sorted(values.tolist())
+
+
+def build_antibiogram(ds: Dataset, scope: Scope, as_of: date, split: Split | None = None) -> dict:
     if not scope.specimen:
         raise ValueError("an antibiogram needs a specimen type")
     wins = [windows.recent(as_of), windows.annual(as_of)]
@@ -59,37 +80,18 @@ def build_antibiogram(ds: Dataset, scope: Scope, as_of: date) -> dict:
         [any((o, code) in ds.tested_pairs for o in organisms) for code in abx.antibiotic_code]
     ]
 
+    codes = list(abx.antibiotic_code)
     own_total = int(own_annual.sum())
     rows = []
     for org in organisms:
-        cells: dict[str, dict | None] = {}
-        for code in abx.antibiotic_code:
-            if (org, code) not in ds.tested_pairs:
-                cells[code] = None  # never tested / not reported for this organism
-                continue
-            cell: dict = {"intrinsic": is_intrinsic(org, code)}
-            for w in wins:
-                levels = [_estimate_for(counts, org, code) for counts, _ in results[w.key]]
-                shown = next((i for i, e in enumerate(levels) if e["sufficient"]), None)
-                cell[w.key] = {"levels": levels, "shown": shown}
-            if cell["recent"]["levels"][0]["sufficient"]:
-                cell["headline"] = "recent"
-            elif cell["annual"]["shown"] is not None:
-                cell["headline"] = "annual"
-            else:
-                cell["headline"] = None
-            cells[code] = cell
-        rows.append(
-            {
-                "organism": org,
-                "isolates": {
-                    w.key: [int(org_counts.get(org, 0)) for _, org_counts in results[w.key]]
-                    for w in wins
-                },
-                "share_annual": round(own_annual.get(org, 0) / own_total, 3) if own_total else 0,
-                "cells": cells,
-            }
-        )
+        row = {
+            "organism": org,
+            **_row(ds, org, codes, results, wins),
+            "share_annual": round(own_annual.get(org, 0) / own_total, 3) if own_total else 0,
+        }
+        if split is not None and split.organism == org:
+            row["split"] = _split(ds, scope, split, org, codes, wins)
+        rows.append(row)
 
     return {
         "as_of": as_of.isoformat(),
@@ -111,6 +113,47 @@ def build_antibiogram(ds: Dataset, scope: Scope, as_of: date) -> dict:
         ],
         "organisms": rows,
     }
+
+
+def _row(ds: Dataset, org: str, codes: list[str], results: dict, wins: list[Window]) -> dict:
+    cells: dict[str, dict | None] = {}
+    for code in codes:
+        if (org, code) not in ds.tested_pairs:
+            cells[code] = None  # never tested / not reported for this organism
+            continue
+        cell: dict = {"intrinsic": is_intrinsic(org, code)}
+        for w in wins:
+            levels = [_estimate_for(counts, org, code) for counts, _ in results[w.key]]
+            shown = next((i for i, e in enumerate(levels) if e["sufficient"]), None)
+            cell[w.key] = {"levels": levels, "shown": shown}
+        if cell["recent"]["levels"][0]["sufficient"]:
+            cell["headline"] = "recent"
+        elif cell["annual"]["shown"] is not None:
+            cell["headline"] = "annual"
+        else:
+            cell["headline"] = None
+        cells[code] = cell
+    return {
+        "isolates": {
+            w.key: [int(org_counts.get(org, 0)) for _, org_counts in results[w.key]] for w in wins
+        },
+        "cells": cells,
+    }
+
+
+def _split(ds, scope, split: Split, org, codes, wins) -> dict:
+    rows = []
+    for value in split_values(ds, split.by):
+        sub = replace(scope, **{split.by: value})
+        results = {w.key: [resistance_counts(ds, s, w) for s in sub.chain(ds.wards)] for w in wins}
+        rows.append(
+            {
+                "value": value,
+                "label": value_label(split.by, value),
+                **_row(ds, org, codes, results, wins),
+            }
+        )
+    return {"by": split.by, "default": split.default, "rows": rows}
 
 
 def _estimate_for(counts: Counts, organism: str, code: str) -> dict:

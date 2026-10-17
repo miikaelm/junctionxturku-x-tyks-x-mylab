@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { Antibiogram as AntibiogramData, Cell, Estimate, Meta } from "../api/client";
 import { levelMark, pct, tier } from "../lib/format";
 import { useApp } from "../state/AppContext";
@@ -5,7 +6,8 @@ import { CiBar } from "./CiBar";
 
 interface Props {
   data: AntibiogramData;
-  onSelect: (organism: string, code: string) => void;
+  /** `sub` is the split value's label when a sub-row cell was clicked. */
+  onSelect: (organism: string, code: string, sub?: string) => void;
 }
 
 /** Organism × antibiotic table, each cell showing last 4 weeks next to last 12 months. */
@@ -36,7 +38,8 @@ export function Antibiogram({ data, onSelect }: Props) {
             const ownAnnual = o.isolates.annual[0];
             const ownRecent = o.isolates.recent[0];
             return (
-              <tr key={o.organism} className={ownAnnual === 0 ? "ab-row-empty" : ""}>
+              <Fragment key={o.organism}>
+              <tr className={ownAnnual === 0 ? "ab-row-empty" : ""}>
                 <th scope="row" className="ab-org">
                   <span className="ab-org-name">{o.organism}</span>
                   <span className="ab-org-meta">
@@ -68,6 +71,36 @@ export function Antibiogram({ data, onSelect }: Props) {
                   );
                 })}
               </tr>
+              {o.split?.rows.map((sub) => (
+                <tr key={String(sub.value)} className="ab-subrow">
+                  <th scope="row" className="ab-org ab-sub">
+                    <span className="ab-org-name">↳ {sub.label}</span>
+                    <span className="ab-org-meta">
+                      <span className="mono">
+                        {sub.isolates.annual[0]} / {sub.isolates.recent[0]}
+                      </span>
+                    </span>
+                  </th>
+                  {data.antibiotics.map((a) => {
+                    const cell = sub.cells[a.code];
+                    return (
+                      <td key={a.code} className="ab-td">
+                        {cell ? (
+                          <CellButton
+                            cell={cell}
+                            levels={data.levels}
+                            label={`${o.organism} (${sub.label}), ${a.name}`}
+                            onClick={() => onSelect(o.organism, a.code, sub.label)}
+                          />
+                        ) : (
+                          <span className="ab-na">·</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              </Fragment>
             );
           })}
         </tbody>

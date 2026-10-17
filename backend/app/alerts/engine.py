@@ -7,7 +7,11 @@ would have been raised then, each with its first-seen date, and an alert stays a
 type's `active_days` after its last firing (NOTIF-04 severity, lifecycle).
 
 Detectors look at no data after their own evaluation day, so the whole timeline is computed
-once per dataset and cached; each request only filters it.
+once per dataset and cached; each request only filters it. After an ingest (DATA-05) the
+firings before the batch's earliest sample date are kept and the detectors re-run from there.
+
+Each alert also records its *onset*, the earliest case behind its first firing, so detection
+latency (onset → first alert) can be read off any replay (ANOM-07).
 """
 
 import re
@@ -19,9 +23,11 @@ from app.alerts.triage import TriageStore
 from app.config import (
     ALERT_TYPES,
     DISMISS_SUPPRESS_DAYS,
+    REPLAY_LEAD_DAYS,
     RESOLVED_LOOKBACK_DAYS,
     SEVERITY_ORDER,
 )
+from app.data import store as data_store
 from app.data.dataset import Dataset
 from app.detectors.cluster import detect_clusters
 from app.detectors.common import Firing
@@ -44,6 +50,7 @@ class Episode:
     ward: str
     subject: str
     firings: tuple[Firing, ...]  # sorted by day
+    onset: date  # earliest case behind the first firing (ANOM-07)
 
     @property
     def key(self) -> tuple[str, str, str]:
@@ -62,39 +69,78 @@ class Episode:
         return [f for f in self.firings if f.day <= as_of]
 
 
-def build_episodes(firings: list[Firing]) -> list[Episode]:
+def build_episodes(ds: Dataset, firings: list[Firing]) -> list[Episode]:
     by_key: dict[tuple[str, str, str], list[Firing]] = {}
     for f in sorted(firings, key=lambda f: f.day):
         by_key.setdefault((f.type, f.ward, f.subject), []).append(f)
-    episodes = []
+    groups = []
     for (type_, ward, subject), fs in by_key.items():
         gap = ALERT_TYPES[type_]["episode_gap"]
         current = [fs[0]]
         for f in fs[1:]:
             if (f.day - current[-1].day).days > gap:
-                episodes.append(Episode(type_, ward, subject, tuple(current)))
+                groups.append((type_, ward, subject, current))
                 current = []
             current.append(f)
-        episodes.append(Episode(type_, ward, subject, tuple(current)))
+        groups.append((type_, ward, subject, current))
+    sample_dates = ds.isolates.set_index("isolate_id").sample_date
+    episodes = [
+        Episode(type_, ward, subject, tuple(fs), _onset(fs[0], sample_dates))
+        for type_, ward, subject, fs in groups
+    ]
     return sorted(episodes, key=lambda e: (e.first, e.id))
 
 
-_cache: dict[tuple[int, date], tuple[Dataset, list[Episode]]] = {}
+def _onset(first: Firing, sample_dates) -> date:
+    """When the event behind an alert began, as far as the data shows: the day after the last
+    sample for a data gap, else the earliest case the first firing counted."""
+    if first.type == "data_gap":
+        return date.fromisoformat(first.evidence["last_sample"]) + timedelta(days=1)
+    if not first.isolate_ids:
+        return first.day
+    return min(first.day, sample_dates[list(first.isolate_ids)].min().date())
+
+
+# id(dataset) → (dataset, horizon, firings, episodes)
+_cache: dict[int, tuple[Dataset, date, list[Firing], list[Episode]]] = {}
 
 
 def timeline(ds: Dataset, as_of: date) -> list[Episode]:
     """All alert episodes, computed through max(data end, as_of). Cached per dataset."""
     horizon = max(ds.end.date(), as_of)
-    key = (id(ds), horizon)
-    hit = _cache.get(key)
-    if hit is not None and hit[0] is ds:
-        return hit[1]
+    hit = _cache.get(id(ds))
+    if hit is not None and hit[0] is ds and hit[1] >= horizon:
+        return hit[3]
     firings = [f for detect in DETECTORS for f in detect(ds, horizon)]
-    episodes = build_episodes(firings)
+    return _remember(ds, horizon, firings)
+
+
+def _remember(ds: Dataset, horizon: date, firings: list[Firing]) -> list[Episode]:
+    episodes = build_episodes(ds, firings)
     if len(_cache) >= 4:
         _cache.clear()
-    _cache[key] = (ds, episodes)
+    _cache[id(ds)] = (ds, horizon, firings, episodes)
     return episodes
+
+
+def update(old: Dataset, new: Dataset, since: date | None) -> None:
+    """Ingest hook (DATA-05): carry the cached timeline over to the new dataset, re-running the
+    detectors only for days from `since` (the batch's earliest sample date) on."""
+    hit = _cache.get(id(old))
+    if hit is None or hit[0] is not old:
+        return  # nothing cached yet: computed on the next request
+    _, horizon, firings, _ = hit
+    if since is None:
+        _remember(new, horizon, firings)
+        return
+    since = min(since, horizon + timedelta(days=1))  # no uncomputed days in between
+    horizon = max(horizon, new.end.date())
+    kept = [f for f in firings if f.day < since]
+    fresh = [f for detect in DETECTORS for f in detect(new, horizon, since)]
+    _remember(new, horizon, kept + fresh)
+
+
+data_store.INGEST_HOOKS.append(update)
 
 
 def summarize(ds: Dataset, episode: Episode, as_of: date, store: TriageStore) -> dict:
@@ -115,6 +161,8 @@ def summarize(ds: Dataset, episode: Episode, as_of: date, store: TriageStore) ->
         "title": last.title,
         "first_seen": episode.first.isoformat(),
         "last_seen": last.day.isoformat(),
+        "onset": episode.onset.isoformat(),
+        "detection_days": (episode.first - episode.onset).days,
         "firings": len(fs),
         "state": "active" if active else "resolved",
         "resolved_on": None
@@ -187,6 +235,35 @@ def counts(alerts: list[dict]) -> dict:
             if any(a["severity"] == sev for a in active)
         },
     }
+
+
+def replay_events(ds: Dataset, today: date, store: TriageStore) -> list[dict]:
+    """Every alert raised up to `today`, newest first, each with a replay start a few days
+    before its onset (LIVE-04) and its detection latency (ANOM-07). Built from the alerts
+    themselves, so it covers whatever the detectors found."""
+    start = ds.start.date()
+    out = []
+    for e in timeline(ds, today):
+        if e.first > today:
+            continue
+        cfg = ALERT_TYPES[e.type]
+        out.append(
+            {
+                "id": e.id,
+                "type": e.type,
+                "type_label": cfg["label"],
+                "severity": cfg["severity"],
+                "ward": e.ward,
+                "subject": e.subject,
+                "title": e.firings[0].title,
+                "onset": e.onset.isoformat(),
+                "first_seen": e.first.isoformat(),
+                "detection_days": (e.first - e.onset).days,
+                "replay_from": max(start, e.onset - timedelta(days=REPLAY_LEAD_DAYS)).isoformat(),
+                "triage": summarize(ds, e, today, store)["triage"]["status"],
+            }
+        )
+    return sorted(out, key=lambda x: x["first_seen"], reverse=True)
 
 
 def warm(ds: Dataset, as_of: date) -> None:

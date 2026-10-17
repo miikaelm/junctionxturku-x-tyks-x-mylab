@@ -4,17 +4,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import config
 from app.alerts import engine
 from app.api.routes import router
-from app.data.dataset import get_dataset
+from app.data.store import get_store
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Load the data and run the detectors in the background so the first page is fast.
     threading.Thread(
-        target=lambda: engine.warm(get_dataset(), config.DEFAULT_AS_OF), daemon=True
+        target=lambda: engine.warm(get_store().dataset, get_store().today()), daemon=True
     ).start()
     yield
 

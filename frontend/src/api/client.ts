@@ -19,6 +19,7 @@ export interface Meta {
   data_start: string;
   data_end: string;
   default_as_of: string;
+  data_version: number;
   wards: Ward[];
   locations: { code: string; label: string; level: "institution" | "all" }[];
   specimens: Specimen[];
@@ -27,8 +28,23 @@ export interface Meta {
   alert_types: { key: AlertType; label: string; severity: Severity }[];
   severities: Severity[];
   triage_statuses: TriageStatus[];
-  thresholds: { min_isolates: number; good_below: number; warn_below: number; ci_level: number };
+  home_areas: string[];
+  split_dimensions: { key: SplitBy; label: string }[];
+  phenotypes: string[];
+  key_rates: { specimen: Specimen; organism: string; antibiotic: string; antibiotic_name: string }[];
+  tested_pairs: [string, string][];
+  intrinsic: Record<string, string[]>;
+  antibiotics: { code: string; name: string; reported_for: string }[];
+  thresholds: {
+    min_isolates: number;
+    good_below: number;
+    warn_below: number;
+    ci_level: number;
+    empirical_pct: number;
+  };
 }
+
+export type SplitBy = "sex" | "age_band" | "hospital_acquired" | "ward_type" | "home_area";
 
 export type Specimen = "urine" | "blood" | "wound";
 export type Level = "ward" | "institution" | "all";
@@ -54,11 +70,20 @@ export interface Cell {
   headline: "recent" | "annual" | null;
 }
 
+export interface SubRow {
+  value: string | boolean;
+  label: string;
+  isolates: { recent: number[]; annual: number[] };
+  cells: Record<string, Cell | null>;
+}
+
 export interface OrganismRow {
   organism: string;
   isolates: { recent: number[]; annual: number[] };
   share_annual: number;
   cells: Record<string, Cell | null>;
+  /** Sub-rows by a patient dimension (STAT-07): default for known splits, or asked for. */
+  split?: { by: SplitBy; default: boolean; rows: SubRow[] };
 }
 
 export interface Antibiotic {
@@ -141,6 +166,9 @@ export interface AlertSummary {
   title: string;
   first_seen: string;
   last_seen: string;
+  /** Earliest case behind the first firing (ANOM-07). */
+  onset: string;
+  detection_days: number;
   firings: number;
   state: "active" | "resolved";
   resolved_on: string | null;
@@ -220,7 +248,176 @@ export interface AntibiogramQuery {
   sex?: "F" | "M";
   age_band?: string;
   hospital_acquired?: boolean;
+  split_by?: SplitBy | "none";
+  split_organism?: string;
   as_of?: string;
+}
+
+// ---------- Replay, trends, subgroups, overview, ingestion (slice 3) ----------
+
+export interface IngestEntry {
+  version: number;
+  at: string;
+  source: string;
+  rows: Record<string, number>;
+  sample_dates: { from: string; to: string } | null;
+  recomputed_from: string | null;
+  seconds: { join: number; total: number };
+}
+
+export interface Status {
+  version: number;
+  data_start: string;
+  data_end: string;
+  today: string;
+  rows: Record<string, number>;
+  held_back: { from: string; to: string; days: number; cultures: number } | null;
+  last_ingest: IngestEntry | null;
+  ingests: number;
+}
+
+export interface ReplayEvent {
+  id: string;
+  type: AlertType;
+  type_label: string;
+  severity: Severity;
+  ward: string;
+  subject: string;
+  title: string;
+  onset: string;
+  first_seen: string;
+  detection_days: number;
+  replay_from: string;
+  triage: TriageStatus;
+}
+
+export interface SubgroupLevel extends Estimate {
+  value: string | boolean;
+  label: string;
+}
+
+export interface SubgroupFinding {
+  dimension: string;
+  dimension_label: string;
+  organism: string;
+  antibiotic_code: string;
+  antibiotic: string;
+  levels: SubgroupLevel[];
+  high: string;
+  low: string;
+  diff_pp: number;
+  p_value: number;
+  q_value: number;
+  text: string;
+}
+
+export interface Subgroups {
+  as_of: string;
+  window: { start: string; end: string; label: string };
+  dimensions: { key: string; label: string }[];
+  compared: number;
+  findings: SubgroupFinding[];
+}
+
+export interface TrendStats {
+  direction: "up" | "down";
+  pp_per_year: number;
+  change_pp: number;
+  p_value: number;
+  q_value: number | null;
+  significant: boolean;
+  eligible: boolean;
+  n: number;
+  quarters: number;
+}
+
+export interface TrendFinding {
+  location: string;
+  location_label: string;
+  level: Level;
+  specimen: Specimen;
+  organism: string;
+  antibiotic_code: string;
+  antibiotic: string;
+  last_12m: Estimate;
+  prev_12m: Estimate;
+  trend?: TrendStats;
+}
+
+export interface TrendFindings {
+  as_of: string;
+  threshold_pct: number;
+  tested: number;
+  trends: (TrendFinding & { trend: TrendStats })[];
+  crossings: (TrendFinding & { direction: "up" | "down"; clearly: boolean })[];
+}
+
+export interface TrendPoint extends Estimate {
+  label: string;
+  start: string;
+  end: string;
+  fitted: number | null;
+}
+
+export interface YearRate extends Estimate {
+  year: number;
+  start: string;
+  end: string;
+  partial: boolean;
+}
+
+export interface TrendSeries {
+  as_of: string;
+  scope: { location: string; label: string; specimen: Specimen };
+  organism: string;
+  antibiotic_code: string;
+  antibiotic: string;
+  threshold_pct: number;
+  points: TrendPoint[];
+  trend: TrendStats | null;
+  trend_crosses_threshold: string | null;
+  years: YearRate[];
+  year_vs_year: {
+    last: Estimate & { start: string; end: string };
+    previous: Estimate & { start: string; end: string };
+    p_value: number | null;
+    method: string;
+  };
+}
+
+export interface OverviewMarker {
+  id: string;
+  type: AlertType;
+  type_label: string;
+  severity: Severity;
+  ward: string;
+  first_seen: string;
+  title: string;
+}
+
+export interface OverviewCell extends Partial<Estimate> {
+  value?: number;
+  alerts?: OverviewMarker[];
+}
+
+export interface Overview {
+  as_of: string;
+  metric: "phenotype" | "rate";
+  kind: "count" | "rate";
+  bin_days: number;
+  bins: { start: string; end: string }[];
+  rows: { ward: string; label: string; cells: OverviewCell[] }[];
+}
+
+export interface OverviewQuery {
+  metric: "phenotype" | "rate";
+  phenotype?: string;
+  specimen?: Specimen;
+  organism?: string;
+  antibiotic?: string;
+  bins: number;
+  bin_days: number;
+  as_of: string;
 }
 
 type Params = Record<string, string | number | boolean | undefined>;
@@ -256,4 +453,17 @@ export const api = {
     get<AlertDetail>(`/alerts/${encodeURIComponent(id)}`, { as_of }, signal),
   triage: (id: string, status: TriageStatus, as_of: string, note = "") =>
     post<TriageEntry>(`/alerts/${encodeURIComponent(id)}/triage`, { status, note, as_of }),
+  status: (signal?: AbortSignal) => get<Status>("/status", {}, signal),
+  replayEvents: (signal?: AbortSignal) =>
+    get<{ today: string; events: ReplayEvent[] }>("/replay/events", {}, signal),
+  subgroups: (q: { location: string; specimen: Specimen; as_of: string }, signal?: AbortSignal) =>
+    get<Subgroups>("/subgroups", { ...q }, signal),
+  trendFindings: (as_of: string, signal?: AbortSignal) =>
+    get<TrendFindings>("/trends/findings", { as_of }, signal),
+  trendSeries: (
+    q: { location: string; specimen: Specimen; organism: string; antibiotic: string; as_of: string },
+    signal?: AbortSignal,
+  ) => get<TrendSeries>("/trends/series", { ...q }, signal),
+  overview: (q: OverviewQuery, signal?: AbortSignal) => get<Overview>("/overview", { ...q }, signal),
+  ingestHeldBack: (days: number) => post<IngestEntry>(`/ingest/held-back?days=${days}`, {}),
 };

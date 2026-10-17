@@ -36,6 +36,8 @@ export function Header({ route }: { route: Route }) {
       <nav className="nav">
         {item("ward", "My Ward")}
         {item("alerts", "Alerts", alertCounts?.new)}
+        {item("overview", "Overview")}
+        {item("trends", "Trends")}
         {item("feed", "Feed status")}
       </nav>
       <TimeCursor />

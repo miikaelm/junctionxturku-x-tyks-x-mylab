@@ -20,7 +20,7 @@ export function AlertInbox() {
         { as_of: asOf, location, type: type || undefined, include_resolved: includeResolved },
         signal,
       ),
-    [asOf, location, type, includeResolved, alertsVersion],
+    [asOf, location, type, includeResolved, alertsVersion, meta.data_version],
   );
   const alerts = (data?.alerts ?? []).filter((a) => !hideDismissed || a.triage.status !== "dismissed");
   const hidden = (data?.alerts.length ?? 0) - alerts.length;

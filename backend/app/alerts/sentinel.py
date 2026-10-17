@@ -36,7 +36,7 @@ def sentinel_matches(ds: Dataset, horizon: date) -> pd.DataFrame:
     return matches
 
 
-def detect_sentinels(ds: Dataset, horizon: date) -> list[Firing]:
+def detect_sentinels(ds: Dataset, horizon: date, since: date | None = None) -> list[Firing]:
     matches = sentinel_matches(ds, horizon)
     # "First in N days" per ward and marker, over all of that marker's cases.
     per_day = matches.drop_duplicates(["ward_code", "marker", "sample_date"])
@@ -45,6 +45,8 @@ def detect_sentinels(ds: Dataset, horizon: date) -> list[Firing]:
 
     labels = {r["key"]: r["label"] for r in SENTINEL_RULES}
     firings = []
+    if since:  # the "first in N days" note above still looks at all earlier cases
+        matches = matches[matches.sample_date >= pd.Timestamp(since)]
     for m in matches.itertuples(index=False):
         gap, first_ever = novelty.loc[(m.ward_code, m.marker, m.sample_date)]
         seen = (

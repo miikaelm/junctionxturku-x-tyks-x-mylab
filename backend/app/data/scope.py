@@ -18,6 +18,8 @@ class Scope:
     sex: str | None = None
     age_band: str | None = None
     hospital_acquired: bool | None = None
+    ward_type: str | None = None  # "in" | "out"
+    home_area: str | None = None
 
     def level(self, wards: pd.DataFrame) -> str:
         if self.location == "all":
@@ -67,6 +69,10 @@ class Scope:
             mask &= df.age_band.eq(self.age_band)
         if self.hospital_acquired is not None:
             mask &= df.hospital_acquired.eq(self.hospital_acquired)
+        if self.ward_type:
+            mask &= df.ward_type.eq(self.ward_type)
+        if self.home_area:
+            mask &= df.home_area.eq(self.home_area)
         return df[mask]
 
     def ward_codes(self, wards: pd.DataFrame) -> set[str]:
@@ -87,4 +93,6 @@ class Scope:
             "sex": self.sex,
             "age_band": self.age_band,
             "hospital_acquired": self.hospital_acquired,
+            "ward_type": self.ward_type,
+            "home_area": self.home_area,
         }

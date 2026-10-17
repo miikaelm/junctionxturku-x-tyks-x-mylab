@@ -26,14 +26,22 @@ from app.config import (
 )
 from app.data.dataset import Dataset
 from app.data.intrinsic import is_intrinsic
-from app.detectors.common import Firing, bh_qvalues, day_index, n_days, significant, to_date
+from app.detectors.common import (
+    Firing,
+    bh_qvalues,
+    day_index,
+    first_index,
+    n_days,
+    significant,
+    to_date,
+)
 from app.stats.proportions import estimate
 
 STRATUM = ["ward_code", "patient_id", "organism", "specimen"]  # first isolate per ward
 CELL = ["ward_code", "specimen", "organism", "antibiotic_code"]
 
 
-def detect_rate_shifts(ds: Dataset, horizon: date) -> list[Firing]:
+def detect_rate_shifts(ds: Dataset, horizon: date, since: date | None = None) -> list[Firing]:
     iso = ds.isolates[["isolate_id", *STRATUM]].copy()
     iso["day"] = day_index(ds, ds.isolates.sample_date)
     iso_pos = pd.Series(np.arange(len(iso)), index=iso.isolate_id)
@@ -56,7 +64,7 @@ def detect_rate_shifts(ds: Dataset, horizon: date) -> list[Firing]:
 
     first_day = ds.start.date() + timedelta(days=RECENT_WINDOW_DAYS + MIN_BASELINE_DAYS - 1)
     firings = []
-    for t in range(n_days(ds, horizon)):
+    for t in range(first_index(ds, since), n_days(ds, horizon)):
         day = to_date(ds, t)
         if day.weekday() != RATE_SHIFT_EVAL_WEEKDAY or day < first_day:
             continue
@@ -133,4 +141,19 @@ def _firing(ds, day, ward, specimen, organism, shifts, m) -> Firing:
             "antibiotic": lead["antibiotic"],
             "shifts": shifts,
         },
+        isolate_ids=_resistant_cases(ds, rec_start, day, ward, specimen, organism, shifts),
     )
+
+
+def _resistant_cases(ds, start, end, ward, specimen, organism, shifts) -> tuple[str, ...]:
+    """First isolates in the recent window resistant to any of the shifted antibiotics."""
+    iso = ds.isolates[
+        ds.isolates.ward_code.eq(ward)
+        & ds.isolates.specimen.eq(specimen)
+        & ds.isolates.sample_date.between(pd.Timestamp(start), pd.Timestamp(end))
+    ].drop_duplicates(STRATUM)
+    iso = iso[iso.organism.eq(organism)]
+    ast = ds.ast[ds.ast.isolate_id.isin(iso.isolate_id)]
+    codes = {s["antibiotic_code"] for s in shifts}
+    hit = ast.isolate_id[ast.resistant & ast.antibiotic_code.isin(codes)]
+    return tuple(iso.isolate_id[iso.isolate_id.isin(hit)])

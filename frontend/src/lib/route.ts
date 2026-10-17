@@ -5,13 +5,17 @@ export type Route =
   | { view: "ward" }
   | { view: "alerts" }
   | { view: "alert"; id: string }
-  | { view: "feed" };
+  | { view: "feed" }
+  | { view: "overview" }
+  | { view: "trends" };
 
 export function parseHash(hash: string): Route {
   const [view, id] = hash.replace(/^#\/?/, "").split("/");
   if (view === "alerts" && id) return { view: "alert", id: decodeURIComponent(id) };
   if (view === "alerts") return { view: "alerts" };
   if (view === "feed") return { view: "feed" };
+  if (view === "overview") return { view: "overview" };
+  if (view === "trends") return { view: "trends" };
   return { view: "ward" };
 }
 

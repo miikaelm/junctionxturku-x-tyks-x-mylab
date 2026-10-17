@@ -35,6 +35,7 @@ from app.detectors.common import (
     cumulative,
     daily_counts,
     days_since_previous,
+    first_index,
     n_days,
     phenotype_cases,
     significant,
@@ -52,7 +53,7 @@ def new_cases(ds: Dataset) -> pd.DataFrame:
     return cases[cases.first_ever | (cases.gap_days > CLUSTER_CASE_DEDUP_DAYS)]
 
 
-def detect_clusters(ds: Dataset, horizon: date) -> list[Firing]:
+def detect_clusters(ds: Dataset, horizon: date, since: date | None = None) -> list[Firing]:
     cases = new_cases(ds)
     combos = [(w, p) for w in ds.wards.ward_code for p in PHENOTYPES]
     counts = np.stack(
@@ -80,6 +81,7 @@ def detect_clusters(ds: Dataset, horizon: date) -> list[Firing]:
     p[tested] = poisson.sf(observed[tested] - 1, expected[tested])
 
     firings = []
+    tested[:, : first_index(ds, since)] = False
     for day in np.flatnonzero(tested.any(axis=0)):
         q = bh_qvalues(p[:, day], m=len(combos))
         for i in np.flatnonzero(significant(q) & tested[:, day]):
