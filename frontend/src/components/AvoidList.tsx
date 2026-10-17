@@ -10,9 +10,9 @@ export function monthYear(iso: string): string {
 }
 
 /**
- * What not to use for one infection (UX-05, UX-07), in two groups that say why: long-standing
- * (12-month figures, with since when, direction and the stewardship review) and new (a rise in the
- * last 4 weeks, with the alert that measured it and the outbreak it most likely comes from).
+ * What not to use for one infection (UX-05, UX-07), in two groups that say why: new first (a rise
+ * in the last 4 weeks, with the alert that measured it and the outbreak it most likely comes from),
+ * then long-standing (12-month figures, with since when, direction and the stewardship review).
  * Agents without a warning are named on one line, so a doctor can check the one they have in mind.
  */
 export function AvoidList({ data, full = true }: { data: Avoid; full?: boolean }) {
@@ -23,18 +23,6 @@ export function AvoidList({ data, full = true }: { data: Avoid; full?: boolean }
   return (
     <div className="avoid">
       {none && <p className="avoid-none">No antibiotic has a local resistance warning for a {label} here.</p>}
-      {data.avoid.length > 0 && (
-        <div className="avoid-group">
-          <p className="avoid-group-label">
-            <span className="tag tag-long">Long-standing</span> ≥ {data.threshold_pct} % resistant over the last 12 months
-          </p>
-          <ul className="avoid-list">
-            {data.avoid.map((a) => (
-              <AvoidItem key={a.code} agent={a} />
-            ))}
-          </ul>
-        </div>
-      )}
       {data.recent_rise.length > 0 && (
         <div className="avoid-group">
           <p className="avoid-group-label">
@@ -44,6 +32,18 @@ export function AvoidList({ data, full = true }: { data: Avoid; full?: boolean }
           <ul className="avoid-list">
             {data.recent_rise.map((a) => (
               <RiseItem key={a.code} agent={a} />
+            ))}
+          </ul>
+        </div>
+      )}
+      {data.avoid.length > 0 && (
+        <div className="avoid-group">
+          <p className="avoid-group-label">
+            <span className="tag tag-long">Long-standing</span> ≥ {data.threshold_pct} % resistant over the last 12 months
+          </p>
+          <ul className="avoid-list">
+            {data.avoid.map((a) => (
+              <AvoidItem key={a.code} agent={a} />
             ))}
           </ul>
         </div>

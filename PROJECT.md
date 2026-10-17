@@ -264,9 +264,9 @@ This phase reworks *how* the data is presented, per role. Decide the approach be
   the older views (alert detail, trends, spread, feed, carriers, mock EHR) still have slice 2–4 styling.
   After the first review: a sticky level stepper on the overview, "Back to …" buttons, the demo bar and
   an explicit "Change role" button. The spread view (V10) was found too busy; its redesign is open (§10).
-- [x] **UX-07 (S)** **Avoid list says why, in words:** two groups, **"Long-standing"** (12-month figure
-  ≥ 20 %, with since when and direction) and **"New in the last 4 weeks"** (from an active resistance-shift
-  alert). Colour supports the words, it doesn't replace them. A new rise links to **both** related items,
+- [x] **UX-07 (S)** **Avoid list says why, in words:** two groups, **"New in the last 4 weeks"** first, then **"Long-standing"** (12-month figure
+  ≥ 20 %, with since when and direction); "New" comes from an active resistance-shift
+  alert. Colour supports the words, it doesn't replace them. A new rise links to **both** related items,
   each named for what it is: the resistance-shift alert (*the numbers*: 4 weeks vs the year before) and,
   when the cases overlap, the outbreak it most likely comes from (*the cause*, worded as "N of the M resistant
   isolates are cases of the URO ESBL cluster"). A long-standing item links to its stewardship finding
