@@ -14,6 +14,7 @@ export type Route =
   | { view: "patients" }
   | { view: "patient"; id: string }
   | { view: "notifications" }
+  | { view: "finding"; id: string }
   | { view: "ehr"; id?: string };
 
 const SIMPLE = ["start", "feed", "heatmap", "trends", "spread", "patients", "notifications"] as const;
@@ -25,6 +26,8 @@ export function parseHash(hash: string): Route {
   if (view === "alerts") return { view: "alerts" };
   if (view === "patients" && key) return { view: "patient", id: key };
   if (view === "ehr") return { view: "ehr", id: key };
+  if (view === "finding" && key) return { view: "finding", id: key };
+  if (view === "stewardship") return { view: "trends" };
   if (view === "area") return { view: "area", id: key };
   if (view === "overview") return { view: "area" }; // the old name of the drill-down's place
   if (view === "ward") return { view: "ward", id: key };
@@ -35,6 +38,7 @@ export function parseHash(hash: string): Route {
 export function href(route: Route): string {
   if (route.view === "alert") return `#/alerts/${encodeURIComponent(route.id)}`;
   if (route.view === "patient") return `#/patients/${encodeURIComponent(route.id)}`;
+  if (route.view === "finding") return `#/finding/${encodeURIComponent(route.id)}`;
   if ((route.view === "ehr" || route.view === "area" || route.view === "ward") && route.id) {
     return `#/${route.view}/${encodeURIComponent(route.id)}`;
   }
@@ -68,7 +72,8 @@ const LABELS: Partial<Record<Route["view"], string>> = {
   alerts: "all alerts",
   alert: "the alert",
   heatmap: "the heatmap",
-  trends: "trends",
+  trends: "stewardship",
+  finding: "the finding",
   feed: "the lab feed",
   spread: "spread",
   patients: "known carriers",

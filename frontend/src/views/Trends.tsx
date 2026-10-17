@@ -13,6 +13,7 @@ import { TrendChart } from "../components/TrendChart";
 import { fmtDate, pct, shortOrganism } from "../lib/format";
 import { useFetch } from "../lib/hooks";
 import { useApp } from "../state/AppContext";
+import { FindingsToReview } from "./Stewardship";
 
 interface Selection {
   location: string;
@@ -21,7 +22,10 @@ interface Selection {
   antibiotic: string;
 }
 
-/** V6 Trend explorer (ANOM-03): long-term trends, the empirical-use threshold, year vs year. */
+/**
+ * Stewardship (V6): findings to review (ANOM-10) first, then the trend explorer (ANOM-03): long-term
+ * trends, the empirical-use threshold, year vs year.
+ */
 export function Trends() {
   const { meta, asOf } = useApp();
   const findings = useFetch((signal) => api.trendFindings(asOf, signal), [asOf, meta.data_version]);
@@ -42,13 +46,17 @@ export function Trends() {
       <section className="ward-head">
         <div>
           <p className="eyebrow">Lab &amp; stewardship</p>
-          <h1>Trends</h1>
+          <h1>Stewardship</h1>
           <p className="ward-sub">
-            Slow changes in resistance over the years, all locations · as of {fmtDate(asOf)}
+            Long-standing resistance to review, and slow changes over the years · as of {fmtDate(asOf)}
           </p>
         </div>
       </section>
 
+      <h2 className="section-title">Findings to review</h2>
+      <FindingsToReview />
+
+      <h2 className="section-title">Trend tests, all series</h2>
       {findings.error && <p className="error">Could not load trend findings: {findings.error}</p>}
       {findings.data && <Findings data={findings.data} onPick={pick} />}
 
@@ -224,7 +232,7 @@ function SeriesPicker({ sel, onChange }: { sel: Selection; onChange: (s: Selecti
   );
 }
 
-function Series({ sel }: { sel: Selection }) {
+export function Series({ sel }: { sel: Selection }) {
   const { meta, asOf } = useApp();
   const { data, error, loading } = useFetch(
     (signal) => (sel.antibiotic ? api.trendSeries({ ...sel, as_of: asOf }, signal) : Promise.resolve(null)),

@@ -19,6 +19,7 @@ import { Heatmap } from "./views/Heatmap";
 import { PatientView, Patients } from "./views/Patients";
 import { RolePicker } from "./views/RolePicker";
 import { Spread } from "./views/Spread";
+import { FindingView } from "./views/Stewardship";
 import { Trends } from "./views/Trends";
 
 const STATUS_POLL_MS = 10_000;
@@ -157,6 +158,7 @@ export default function App() {
             {route.view === "patients" && <Patients />}
             {route.view === "patient" && <PatientView id={route.id} />}
             {route.view === "notifications" && <Notifications />}
+            {route.view === "finding" && <FindingView id={route.id} />}
           </main>
           <DemoBar settings={replay} onSettings={setReplay} open={demoOpen} onOpen={setDemoOpen} />
         </>

@@ -246,10 +246,22 @@ def order_select(context: dict, as_of: date) -> list[dict]:
                 f"{r['organism']} ({flags['specimen']}): {r['observed']['pct']:g} % resistant "
                 f"({r['observed']['r']}/{r['observed']['n']}) from {r['window']['start']} to "
                 f"{r['window']['end']}, against {r['expected']['pct']:g} % in the 12 months before. "
-                f"Alert raised {r['since']}. The 12-month figure is still below "
-                f"{flags['threshold_pct']:g} %, so this is a recent change. Decision support, "
-                "not a prescription.",
-                [link("Open the alert in AEI", f"alerts/{r['alert_id']}")],
+                f"Alert raised {r['since']}. "
+                + (
+                    f"Likely cause: {r['cause']['type_label'].lower()} ({r['cause']['title']}); "
+                    f"{r['cause']['matching']} of the {r['cause']['of']} resistant isolates are "
+                    "its cases. "
+                    if r["cause"]
+                    else ""
+                )
+                + f"The 12-month figure is still below {flags['threshold_pct']:g} %, so this is "
+                "a recent change. Decision support, not a prescription.",
+                [link("Open the alert in AEI", f"alerts/{r['alert_id']}")]
+                + (
+                    [link("Open the outbreak in AEI", f"alerts/{r['cause']['alert_id']}")]
+                    if r["cause"]
+                    else []
+                ),
             )
         )
     elif chosen in unsuited:

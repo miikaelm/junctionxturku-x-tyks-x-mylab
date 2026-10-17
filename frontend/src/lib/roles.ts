@@ -56,7 +56,7 @@ export const ROLES: Record<Role, RoleInfo> = {
     nav: [
       { view: "area", label: "Overview" },
       { view: "alerts", label: "Alerts" },
-      { view: "trends", label: "Trends" },
+      { view: "trends", label: "Stewardship" },
       { view: "heatmap", label: "Heatmap" },
       { view: "feed", label: "Feed" },
       { view: "spread", label: "Spread" },

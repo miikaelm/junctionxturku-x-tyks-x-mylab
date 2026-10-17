@@ -14,8 +14,11 @@ anomalies. One payload covers every level, so drilling down needs no new request
 from datetime import date
 
 from app.alerts import engine
+from app.alerts.detail import case_ids
 from app.alerts.triage import TriageStore
 from app.config import (
+    RISE_CAUSE_MIN_CASES,
+    RISE_CAUSE_MIN_SHARE,
     SEVERITY_ORDER,
     VARHA_FULL,
     VARHA_HOSPITAL,
@@ -157,16 +160,31 @@ def recent_rises(
     ds: Dataset, as_of: date, store: TriageStore, wards: set[str], specimen: str
 ) -> list[dict]:
     """Active resistance-shift alerts on these wards for this specimen, one entry per agent: the
-    short-term rise the 12-month avoid list can't show yet (UX-05)."""
+    short-term rise the 12-month avoid list can't show yet (UX-05). Each names the outbreak it most
+    likely comes from when the patients behind its resistant isolates are mostly that outbreak's
+    cases (UX-07): the shift is the measurement, the outbreak the explanation."""
+    outbreaks = [
+        a
+        for a in engine.alerts_at(ds, as_of, store, wards=wards, types={"cluster", "multi_ward"})
+        if a["triage"]["status"] != "dismissed"
+    ]
+    patient = ds.isolates.set_index("isolate_id").patient_id
+    outbreak_patients = {
+        a["id"]: set(patient[case_ids(ds, engine.find_episode(ds, a["id"], as_of), as_of)])
+        for a in outbreaks
+    }
     out = {}
     for a in engine.alerts_at(ds, as_of, store, wards=wards, types={"rate_shift"}):
         ev = a["evidence"]
         if a["triage"]["status"] == "dismissed" or ev.get("specimen") != specimen:
             continue
+        shift_ids = case_ids(ds, engine.find_episode(ds, a["id"], as_of), as_of)
+        ast = ds.ast[ds.ast.isolate_id.isin(shift_ids) & ds.ast.resistant]
         for s in ev.get("shifts") or [ev]:
             code = s["antibiotic_code"]
             if code in out:
                 continue
+            resistant = set(patient[ast.isolate_id[ast.antibiotic_code.eq(code)]])
             out[code] = {
                 "code": code,
                 "organism": ev["organism"],
@@ -175,6 +193,32 @@ def recent_rises(
                 "window": ev["window"],
                 "since": a["first_seen"],
                 "alert_id": a["id"],
+                "alert_title": a["title"],
                 "ward": a["ward"],
+                "cause": _likely_cause(resistant, a["wards"], outbreaks, outbreak_patients),
             }
     return list(out.values())
+
+
+def _likely_cause(
+    resistant: set[str], wards: list[str], outbreaks: list[dict], patients: dict[str, set[str]]
+) -> dict | None:
+    best = None
+    for o in outbreaks:
+        if set(wards).isdisjoint(o["wards"]):
+            continue
+        matching = len(resistant & patients[o["id"]])
+        if (
+            matching >= RISE_CAUSE_MIN_CASES
+            and matching >= RISE_CAUSE_MIN_SHARE * len(resistant)
+            and (best is None or matching > best["matching"])
+        ):
+            best = {
+                "alert_id": o["id"],
+                "type_label": o["type_label"],
+                "title": o["title"],
+                "wards": o["wards"],
+                "matching": matching,
+                "of": len(resistant),
+            }
+    return best

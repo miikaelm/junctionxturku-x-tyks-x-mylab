@@ -4,7 +4,7 @@ import { ROLES } from "../lib/roles";
 import { href, type Route } from "../lib/route";
 import { useApp } from "../state/AppContext";
 
-const VIEW_OF: Partial<Record<Route["view"], Route["view"]>> = { alert: "alerts", patient: "patients" };
+const VIEW_OF: Partial<Record<Route["view"], Route["view"]>> = { alert: "alerts", patient: "patients", finding: "trends" };
 
 /**
  * Top bar. Clinicians get no badge (UX-06): their ward's alerts are on My Ward itself. The date

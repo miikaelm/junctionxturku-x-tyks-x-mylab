@@ -36,13 +36,13 @@ GAP_TIMELINE_DAYS = 56
 
 def episode_detail(ds: Dataset, episode: Episode, as_of: date) -> dict:
     fs = episode.up_to(as_of)
-    case_ids = _case_ids(ds, episode, as_of)
-    cases = line_list(ds, case_ids, _highlight(episode))
+    ids = case_ids(ds, episode, as_of)
+    cases = line_list(ds, ids, _highlight(episode))
     similarity = None
     if episode.type in ("cluster", "multi_ward"):
         ev = fs[0].evidence
         similarity = cluster_similarity(
-            ds, case_ids, ev["phenotype"], date.fromisoformat(ev["window"]["start"])
+            ds, ids, ev["phenotype"], date.fromisoformat(ev["window"]["start"])
         )
         if similarity:
             for c in cases:
@@ -168,7 +168,7 @@ def _highlight(episode: Episode) -> str | None:
     )
 
 
-def _case_ids(ds: Dataset, episode: Episode, as_of: date) -> list[str]:
+def case_ids(ds: Dataset, episode: Episode, as_of: date) -> list[str]:
     fs = episode.up_to(as_of)
     if episode.type == "rate_shift":
         # First isolates of the shifted organism in the latest 4-week window.

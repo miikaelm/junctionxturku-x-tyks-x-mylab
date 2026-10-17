@@ -316,3 +316,23 @@ VARHA_LABEL = "Varha"
 VARHA_FULL = "Southwest Finland wellbeing services county"
 VARHA_HOSPITAL = {"key": "tyks", "label": "Tyks", "full": "Turku University Hospital"}
 VARHA_PLACEHOLDERS = ["Loimaa hospital", "Vakka-Suomi hospital", "Salo hospital"]
+
+# ---------- Slice 5b: review fixes ----------
+# A recent rise names an outbreak as its likely cause (UX-07) when at least this share of the
+# patients behind the resistant isolates are cases of an active cluster or multi-ward alert on
+# the same ward, and at least this many.
+RISE_CAUSE_MIN_SHARE = 0.5
+RISE_CAUSE_MIN_CASES = 3
+# Stewardship findings (ANOM-10): owned by lab / stewardship, with their own status.
+STEWARDSHIP_STATUSES = ("new", "under_review", "guideline_updated", "accepted")
+STEWARDSHIP_STATUS_LABELS = {
+    "new": "Not yet reviewed",
+    "under_review": "Under review by stewardship",
+    "guideline_updated": "Reviewed: local guideline updated",
+    "accepted": "Reviewed: guideline unchanged",
+}
+STEWARDSHIP_KINDS = {
+    "crossed": "Crossed the limit",
+    "rising": "Rising, still under the limit",
+    "standing": "Above the limit as far back as the data goes",
+}

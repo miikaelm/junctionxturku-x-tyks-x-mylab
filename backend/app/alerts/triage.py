@@ -17,8 +17,12 @@ STATUSES = ("new", "investigating", "confirmed", "dismissed")
 
 
 class TriageStore:
-    def __init__(self, path: Path):
+    """Status steps per item id, each stored with its as-of date. Also holds the stewardship
+    findings' review status (ANOM-10), with their own statuses."""
+
+    def __init__(self, path: Path, statuses: tuple[str, ...] = STATUSES):
         self.path = path
+        self.statuses = statuses
         self._lock = threading.Lock()
         self._data: dict[str, list[dict]] = {}
         if path.exists():
@@ -36,8 +40,8 @@ class TriageStore:
         return entries[-1] if entries else None
 
     def add(self, alert_id: str, status: str, as_of: date, note: str = "") -> dict:
-        if status not in STATUSES:
-            raise ValueError(f"unknown triage status: {status}")
+        if status not in self.statuses:
+            raise ValueError(f"unknown status: {status}")
         entry = {
             "status": status,
             "as_of": as_of.isoformat(),

@@ -166,6 +166,7 @@ def _organism(ds, chain, counts, prev, org: str, share: float, code: str, as_of:
     row = {
         **entry,
         "status": "above" if above else "below",
+        "location": chain[level].location,
         "level": chain[level].level(ds.wards),
         "level_label": chain[level].label(ds.wards),
         "fell_back": level > 0,

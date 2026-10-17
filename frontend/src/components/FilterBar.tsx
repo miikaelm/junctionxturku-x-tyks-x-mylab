@@ -1,4 +1,4 @@
-import type { Specimen } from "../api/client";
+import type { InfectionFocus } from "./WardExceptions";
 import { useApp } from "../state/AppContext";
 
 export interface Filters {
@@ -8,15 +8,20 @@ export interface Filters {
 }
 
 interface Props {
-  location: string;
-  onLocation: (code: string) => void;
-  specimen: Specimen;
-  onSpecimen: (s: Specimen) => void;
+  focus: InfectionFocus;
+  onFocus: (f: InfectionFocus) => void;
   filters: Filters;
   onFilters: (f: Filters) => void;
 }
 
-function Segmented<T extends string>(props: {
+const SHORT: Record<InfectionFocus, string> = {
+  all: "All",
+  uti: "Urinary",
+  bloodstream: "Bloodstream",
+  wound: "Wound",
+};
+
+export function Segmented<T extends string>(props: {
   label: string;
   value: T;
   options: { value: T; label: string }[];
@@ -40,11 +45,12 @@ function Segmented<T extends string>(props: {
   );
 }
 
-/** Ward, specimen and patient filters (VIEW-02). Ward and specimen are remembered. */
-export function FilterBar({ location, onLocation, specimen, onSpecimen, filters, onFilters }: Props) {
+/**
+ * What narrows the picture (VIEW-02, UX-09): the infection in focus and the patient group. The ward
+ * is not a filter: it is chosen in the page title, since changing it moves to another place.
+ */
+export function FilterBar({ focus, onFocus, filters, onFilters }: Props) {
   const { meta } = useApp();
-  const hospital = meta.wards.filter((w) => w.institution === "hospital");
-  const primary = meta.wards.filter((w) => w.institution === "primary_care");
   const acquisition =
     filters.hospital_acquired === undefined ? "any" : filters.hospital_acquired ? "hospital" : "community";
   const activeCount = [filters.sex, filters.age_band, filters.hospital_acquired].filter((v) => v !== undefined).length;
@@ -52,43 +58,16 @@ export function FilterBar({ location, onLocation, specimen, onSpecimen, filters,
   return (
     <div className="filters">
       <div className="filters-main">
-        <label className="field">
-          <span className="field-label">Ward</span>
-          <select value={location} onChange={(e) => onLocation(e.target.value)}>
-            <optgroup label="Hospital wards">
-              {hospital.map((w) => (
-                <option key={w.ward_code} value={w.ward_code}>
-                  {w.ward_en} ({w.ward_code})
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Health centres">
-              {primary.map((w) => (
-                <option key={w.ward_code} value={w.ward_code}>
-                  {w.ward_en} ({w.ward_code})
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Combined">
-              {meta.locations.map((l) => (
-                <option key={l.code} value={l.code}>
-                  {l.label}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-        </label>
         <div className="field">
-          <span className="field-label">Specimen</span>
+          <span className="field-label">Infection</span>
           <Segmented
-            label="Specimen"
-            value={specimen}
-            onChange={onSpecimen}
-            options={[
-              { value: "urine", label: "Urine" },
-              { value: "blood", label: "Blood" },
-              { value: "wound", label: "Wound" },
-            ]}
+            label="Infection"
+            value={focus}
+            onChange={onFocus}
+            options={(["all", ...meta.infections.map((i) => i.key)] as InfectionFocus[]).map((k) => ({
+              value: k,
+              label: SHORT[k],
+            }))}
           />
         </div>
       </div>

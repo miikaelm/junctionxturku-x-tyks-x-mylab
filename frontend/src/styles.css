@@ -2709,3 +2709,170 @@ a.brand {
     padding-bottom: 220px;
   }
 }
+
+/* ---------- Review fixes (slice 5b): avoid list says why, stewardship, ward as place ---------- */
+.tag-long {
+  background: var(--bad-bg);
+  color: var(--bad);
+  border: 1px solid currentColor;
+}
+.avoid-section + .avoid-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.avoid-section h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.avoid-group + .avoid-group {
+  margin-top: 12px;
+}
+.avoid-group-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.avoid-also,
+.avoid-links,
+.avoid-review {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+}
+.avoid-review a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+.avoid-review a:hover {
+  color: var(--accent);
+}
+.rise-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+}
+.review-text {
+  font-weight: 650;
+}
+.review-text.review-new {
+  color: var(--text-2);
+}
+.review-text.review-under_review {
+  color: var(--accent);
+}
+.review-text.review-guideline_updated,
+.review-text.review-accepted {
+  color: var(--good);
+}
+.review-chip {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  background: var(--none-bg);
+  color: var(--text-2);
+}
+.review-chip.review-under_review {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.review-chip.review-guideline_updated,
+.review-chip.review-accepted {
+  background: var(--good-bg);
+  color: var(--good);
+}
+
+/* Stewardship findings */
+.findings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.finding-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.finding-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: baseline;
+  gap: 4px 16px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+}
+.finding-row:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.finding-numbers,
+.finding-when {
+  white-space: nowrap;
+}
+.findings-standing summary {
+  cursor: pointer;
+}
+
+/* The ward is a place: chosen in the title */
+.ward-switch {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+.ward-switch h1 {
+  margin: 2px 0;
+  padding: 0 6px 0 0;
+  border-bottom: 2px dashed transparent;
+}
+.ward-switch:hover h1,
+.ward-switch:focus-within h1 {
+  border-bottom-color: var(--accent);
+}
+.ward-switch-caret {
+  color: var(--accent);
+  font-size: 0.7em;
+}
+.ward-switch select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 16px;
+}
+.mine-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  letter-spacing: 0.06em;
+}
+.detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+@media (max-width: 600px) {
+  .finding-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .finding-when {
+    grid-column: 1;
+  }
+}

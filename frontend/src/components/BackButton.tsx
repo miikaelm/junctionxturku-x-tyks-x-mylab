@@ -4,6 +4,7 @@ import { useApp } from "../state/AppContext";
 const FALLBACK: Partial<Record<Route["view"], Route>> = {
   alert: { view: "alerts" },
   patient: { view: "patients" },
+  finding: { view: "trends" },
 };
 
 /**

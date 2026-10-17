@@ -11,7 +11,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app import config
-from app.alerts import engine, notify
+from app.alerts import engine, notify, stewardship
 from app.alerts.anomalies import anomalies, recent_rises
 from app.alerts.detail import episode_detail
 from app.alerts.triage import STATUSES, TriageStore, get_triage_store
@@ -33,6 +33,7 @@ router = APIRouter(prefix="/api")
 
 AsOf = Query(None, description="Compute as if this day were today (default: scenario today)")
 Store = Annotated[TriageStore, Depends(get_triage_store)]
+Reviews = Annotated[TriageStore, Depends(stewardship.get_stewardship_store)]
 Subs = Annotated[notify.SubscriptionStore, Depends(notify.get_subscription_store)]
 Specimen = Literal["urine", "blood", "wound"]
 SplitBy = Literal["sex", "age_band", "hospital_acquired", "ward_type", "home_area", "none"]
@@ -631,6 +632,7 @@ def anomaly_overview(store: Store, as_of: date | None = AsOf) -> dict:
 @router.get("/avoid")
 def avoid_list(
     store: Store,
+    reviews: Reviews,
     location: str = Query(..., description="Ward code, 'hospital', 'primary_care' or 'all'"),
     infection: Literal["uti", "bloodstream", "wound"] = "uti",
     sex: Literal["F", "M"] | None = None,
@@ -638,13 +640,50 @@ def avoid_list(
     hospital_acquired: bool | None = None,
     as_of: date | None = AsOf,
 ) -> dict:
-    """What not to use for this infection here (UX-05): agents a main organism is ≥ 20 %
-    resistant to over the last 12 months, with since when and the direction, plus recent rises
-    (active resistance-shift alerts) the 12-month figures don't show yet."""
+    """What not to use for this infection here (UX-05, UX-07): agents a main organism is ≥ 20 %
+    resistant to over the last 12 months, with since when, the direction and the stewardship
+    finding's review status, plus recent rises (active resistance-shift alerts) the 12-month
+    figures don't show yet, with the outbreak they most likely come from."""
     if age_band is not None and age_band not in {b for b, _, _ in config.AGE_BANDS}:
         raise HTTPException(422, f"unknown age_band: {age_band}")
     scope = _scope(location, sex=sex, age_band=age_band, hospital_acquired=hospital_acquired)
     ds, day = get_dataset(), resolve_as_of(as_of)
     result = avoid(ds, scope, infection, day)
+    result = stewardship.attach(ds, result, scope, infection, day, reviews)
     rises = recent_rises(ds, day, store, scope.ward_codes(ds.wards), result["specimen"])
     return with_recent_rises(result, rises)
+
+
+# ---------- Stewardship findings (ANOM-10) ----------
+
+
+@router.get("/stewardship")
+def stewardship_findings(reviews: Reviews, as_of: date | None = AsOf) -> dict:
+    """Long-standing resistance for lab / stewardship to review: threshold crossings, agents
+    above the limit since before the data, and significant rises still under it."""
+    return stewardship.findings(get_dataset(), resolve_as_of(as_of), reviews)
+
+
+@router.get("/stewardship/{finding_id}")
+def stewardship_finding(finding_id: str, reviews: Reviews, as_of: date | None = AsOf) -> dict:
+    as_of = resolve_as_of(as_of)
+    f = stewardship.finding(get_dataset(), as_of, reviews, finding_id)
+    if f is None:
+        raise HTTPException(404, f"no finding {finding_id} as of {as_of}")
+    return {"as_of": as_of.isoformat(), **f}
+
+
+class ReviewAction(BaseModel):
+    status: Literal["new", "under_review", "guideline_updated", "accepted"]
+    note: str = ""
+    as_of: date | None = None
+
+
+@router.post("/stewardship/{finding_id}/review")
+def review_finding(finding_id: str, action: ReviewAction, reviews: Reviews) -> dict:
+    """Record a review step. Like triage, it applies from its as-of date on."""
+    as_of = resolve_as_of(action.as_of)
+    if stewardship.finding(get_dataset(), as_of, reviews, finding_id) is None:
+        raise HTTPException(404, f"no finding {finding_id} as of {as_of}")
+    entry = reviews.add(finding_id, action.status, as_of, action.note)
+    return {"id": finding_id, **entry}

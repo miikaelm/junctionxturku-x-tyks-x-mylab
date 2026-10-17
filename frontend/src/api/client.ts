@@ -781,6 +781,60 @@ export interface AvoidOrganism {
   ci_high?: number;
   direction?: "rising" | "stable" | "easing" | null;
   since?: { date: string; at_least: boolean };
+  /** The location code the figure comes from (the ward, or a broader level it fell back to). */
+  location?: string;
+  /** The stewardship finding behind a flag, with its review status (ANOM-10). */
+  finding?: FindingRef;
+}
+
+export type ReviewStatus = "new" | "under_review" | "guideline_updated" | "accepted";
+export type FindingKind = "crossed" | "rising" | "standing";
+
+export interface Review {
+  status: ReviewStatus;
+  label: string;
+  note: string;
+  as_of: string | null;
+}
+
+export interface FindingRef extends Review {
+  id: string;
+  kind: FindingKind;
+}
+
+/** Long-standing resistance for lab / stewardship to review (ANOM-10). */
+export interface Finding {
+  id: string;
+  kind: FindingKind;
+  location: string;
+  location_label: string;
+  level: Level;
+  specimen: Specimen;
+  infections: string[];
+  organism: string;
+  antibiotic_code: string;
+  antibiotic: string;
+  reserve: boolean;
+  last_12m: Estimate;
+  since: { date: string; at_least: boolean } | null;
+  direction: "rising" | "stable" | "easing" | null;
+  trend: TrendStats | null;
+  wards: string[];
+  review: Review;
+}
+
+export interface Findings {
+  as_of: string;
+  threshold_pct: number;
+  kinds: { key: FindingKind; label: string }[];
+  statuses: { key: ReviewStatus; label: string }[];
+  findings: Finding[];
+  counts: Record<FindingKind | "new", number>;
+}
+
+export interface FindingDetail extends Finding {
+  as_of: string;
+  history: { status: ReviewStatus; as_of: string; note: string; at: string }[];
 }
 
 /** A short-term rise from an active resistance-shift alert, not yet in the 12-month figures. */
@@ -792,7 +846,17 @@ export interface RecentRise {
   window: { start: string; end: string };
   since: string;
   alert_id: string;
+  alert_title: string;
   ward: string;
+  /** The outbreak most of the resistant isolates belong to (UX-07), if any. */
+  cause: {
+    alert_id: string;
+    type_label: string;
+    title: string;
+    wards: string[];
+    matching: number;
+    of: number;
+  } | null;
 }
 
 export interface AvoidAgent {
@@ -855,6 +919,11 @@ export const api = {
   therapy: (q: TherapyQuery, signal?: AbortSignal) => get<Therapy>("/therapy", { ...q }, signal),
   avoid: (q: TherapyQuery, signal?: AbortSignal) => get<Avoid>("/avoid", { ...q }, signal),
   anomalies: (as_of: string, signal?: AbortSignal) => get<Anomalies>("/anomalies", { as_of }, signal),
+  stewardship: (as_of: string, signal?: AbortSignal) => get<Findings>("/stewardship", { as_of }, signal),
+  finding: (id: string, as_of: string, signal?: AbortSignal) =>
+    get<FindingDetail>(`/stewardship/${encodeURIComponent(id)}`, { as_of }, signal),
+  review: (id: string, status: ReviewStatus, as_of: string, note = "") =>
+    post<{ id: string; status: ReviewStatus }>(`/stewardship/${encodeURIComponent(id)}/review`, { status, note, as_of }),
   carriers: (q: { as_of: string; location?: string; phenotype?: string; days?: number; limit?: number }, signal?: AbortSignal) =>
     get<Carriers>("/carriers", { ...q }, signal),
   patient: (id: string, as_of: string, signal?: AbortSignal) =>

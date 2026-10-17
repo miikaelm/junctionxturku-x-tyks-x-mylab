@@ -9,7 +9,7 @@ import {
   type Severity,
   type WardAnomalies,
 } from "../api/client";
-import { AvoidList } from "../components/AvoidList";
+import { AvoidFor } from "../components/WardExceptions";
 import { SeverityPill } from "../components/AlertBits";
 import { daysAgo, fmtDate } from "../lib/format";
 import { useFetch } from "../lib/hooks";
@@ -409,7 +409,7 @@ function WardLevel({ ward, kind }: { ward: WardAnomalies; kind: "hospital" | "he
                 </button>
               ))}
             </div>
-            <AvoidList location={ward.ward_code} infection={infection} compact />
+            <AvoidFor location={ward.ward_code} infection={infection} />
           </>
         )}
       </section>

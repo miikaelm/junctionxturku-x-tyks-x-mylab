@@ -128,3 +128,14 @@ Our convention: first isolate is taken *within the analysed stratum and window* 
 - Blood cultures are thin: SURG, URO and GER fall back to all hospital wards, the health centres to all locations.
 - Short-term rises (resistance-shift alerts) are what changes week to week: during E1, URO E. coli ceftriaxone,
   ciprofloxacin and cefuroxime went to 31–34 % in 4 weeks while the 12-month figures stayed below 20 %.
+
+## Learned while building stewardship findings (slice 5b)
+- At as-of 2025-06-27 the avoid lists of all wards give 28 distinct flags, but most are
+  the same few: ampicillin in E. coli everywhere, nitrofurantoin in K. pneumoniae, trimethoprim in E. coli on the
+  inpatient wards. Only 3 crossed the limit inside the data (URO TMP Apr 2025, ICU TMP Jan 2025, ICU CXM Jun 2025);
+  the rest have been above it for as long as a 12-month figure can be computed (from ~Oct 2024).
+- Collecting them means 27 avoid lists (9 wards × 3 infections): ~10 s cold, then cached per as-of date.
+- During E1 the quarterly trend test also turns up URO E. coli ceftriaxone and cefuroxime as significant upward
+  trends: the outbreak quarter pulls the line up. They show as "rising" findings; read them with the outbreak in mind.
+- The URO resistance shift and the ESBL cluster are the same patients: every ceftriaxone-resistant E. coli first
+  isolate on URO in the 4 weeks to 27 Jun 2025 belongs to a cluster case.
