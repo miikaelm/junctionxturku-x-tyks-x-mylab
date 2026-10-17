@@ -48,7 +48,7 @@ filterable by dataset parameters.
 - Data is clean (no orphans, duplicates or inconsistencies). Finnish + English names available.
 - External EARS-Net / THL data: **optional**, reference only (see DATA-08).
 
-### Context: Varha (**TBA**, parked; nothing built for it)
+### Context: Varha (**TBA**, parked until the usability phase; see UX-01)
 The mentor framed things from the **Varha** angle (*Varsinais-Suomen hyvinvointialue*, the
 wellbeing services county of Southwest Finland). Since 2023 it has run public health, social
 and rescue services for ~490,000 residents in 27 municipalities: Tyks, regional hospitals
@@ -225,6 +225,24 @@ results × grouping dimensions × detectors → alerts + API). Antibiotic resist
 - [ ] **FUT-05 (pitch)** **Analyser drift detection** (*patient-based real-time quality control*): a steady shift across many patients' routine chemistry results signals a machine going out of calibration. Highly relevant for Mylab.
 - [ ] **FUT-06 (pitch)** **Diagnostic stewardship:** unusual test-ordering patterns.
 
+### 4.13 Usability optimization phase (UX) *(proposed)*
+Comes **after** the base features (slices 1–4 are built function-first with simple visuals, see §12).
+This phase reworks *how* the data is presented, per role. Decide the approach before building.
+- [ ] **UX-01 (S)** **Varha angle: figure out first, then build.** How the tool works at the scale of
+  the wellbeing services county (§1): which levels exist (Varha area → institution / hospital → ward),
+  whether we need extension data (EXT-02) to show more than one hospital, and how the pitch positions
+  it (mentor question in §10.1). Output: a design decision in §9 before any code.
+- [ ] **UX-02 (S)** **Exceptions-first view for infection control (R2):** open on what is abnormal
+  (active alerts, red cells, significant shifts) instead of the full antibiogram. Normal / green data
+  stays reachable one step deeper or further down the page ("show all stats"), not up front.
+- [ ] **UX-03 (S)** **Drill-down hierarchy for big-picture users (R2, R3):** Varha area → institution
+  (hospital / health centres) → ward. Each level shows its own overall resistance figures plus a summary
+  per child (e.g. per ward: number of red cells, active alerts, feed status); clicking a child drills
+  down. Must feel intuitive. The STAT-04 fallback chain (ward → institution → all) already matches
+  these levels; Varha would sit above "all".
+- [ ] **UX-04 (S)** **Visual polish pass:** consistent look across all views, animations, responsive
+  layouts, role-specific landing pages (with VIEW-08). V1 got an early polish in slice 1.
+
 ---
 
 ## 5. Domain rules reference
@@ -307,7 +325,7 @@ exactly why STAT-08 matters.
 | 2026-10-17 | Fallback hierarchy (STAT-04): ward → institution (all hospital wards / all health centres) → all locations. V1 cells show the ward's 4-week value (counts if n < 30) next to the 12-month value at the most specific level with n ≥ 30, marked H / P / A when it fell back. STAT-06 shrinkage not built (waiting on mentor). |
 | 2026-10-17 | Traffic light: green < 10 %, amber 10–20 %, red ≥ 20 % (config). Intrinsic pairs show as hatched "Intrinsic R". |
 | 2026-10-17 | Data freshness (VIEW-12) uses a per-ward Poisson silence test: with λ samples/day over the last 8 weeks, d silent days are flagged when exp(−λd) < 0.01 (delayed) or < 0.001 (stale). Busy wards flag after 1 day, ICU after ~3–4. Basis for ANOM-04. |
-| 2026-10-17 | Build in 5 slices (§12). |
+| 2026-10-17 | Build in slices (§12). Base features are built function-first with simple visuals; presentation and visual polish are deferred to the usability optimization phase (§4.13, slice 5). |
 
 ## 10. To-do & open questions
 
@@ -325,6 +343,7 @@ exactly why STAT-08 matters.
 **Team:**
 - [x] Choose the tech stack: React + FastAPI (§9).
 - [ ] Decide which remaining *(proposed)* requirements (EXT) to commit to, and set their priorities.
+- [ ] Figure out how the Varha angle should work in the tool before building anything for it (UX-01).
 
 ### 10.2 Open questions
 - Hackathon timeline and submission format?
@@ -380,4 +399,5 @@ Work is split into vertical slices, one commit series each. Update the status he
 | 2 | Detectors + alerts | NOTIF-01/02/04/06 · ANOM-01, 02, 04, 06, 08 · STAT-08 · V3 inbox, V4 detail, V1 alert strip, V7 feed status | next |
 | 3 | Replay, trends, discovery | LIVE-02/04 · ANOM-03, 07 · V6 trends, V5 heatmap · STAT-07 defaults, STAT-09 · DATA-05 incremental | |
 | 4 | Patients + integration | PAT-01–03 · API-02–05 · NOTIF-03/05 · V2 therapy helper · V10 spread · V11 mock EHR · ANOM-05/09 | |
-| 5 | AI + polish | AI-01–04 · VIEW-08 roles · EXT-* · README, demo presets | |
+| 5 | Usability optimization | UX-01–04 (Varha design, exceptions-first view, drill-down, visual polish) · VIEW-08 roles · VIEW-09 | |
+| 6 | AI, extension data, delivery | AI-01–04 · EXT-* · README, demo presets | |

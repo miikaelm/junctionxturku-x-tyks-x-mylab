@@ -15,6 +15,10 @@ the validation answer key, the decisions log and open questions.
 - Resistance percentages must follow the domain rules in PROJECT.md §5 (first isolate per
   patient × species × specimen per period, n ≥ 30, intrinsic resistances excluded from alerts).
 - Every computation must respect the global as-of date (time cursor): use no data after it.
+- **Function first, simple visuals.** While building the base features (slices 1–4 in PROJECT.md §12),
+  keep the UI plain and simple. Do think about usability (clear labels, the core answer reachable
+  quickly, honest numbers), but don't spend time or tokens on visual polish, layout tuning or
+  animations. That work belongs to the usability optimization phase (PROJECT.md §4.13, slice 5).
 
 ## Layout
 - `backend/`: Python 3.11, FastAPI, managed with `uv`. Package `app/`:
