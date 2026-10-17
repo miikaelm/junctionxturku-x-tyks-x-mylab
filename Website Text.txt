@@ -1,0 +1,36 @@
+The Challenge
+The WHO, the UN and the World Economic Forum have identified antimicrobial resistance (AMR) as one of the most serious global public health threats to humans. Tyks Laboratories carries out antimicrobial susceptibility testing and monitors bacterial resistance. Currently, these reports are compiled annually at hospital level, which is too imprecise and infrequent. When selecting antibiotic treatment for a patient, a doctor wants to see up-to-date information on the susceptibility profile of bacteria in their own ward. Develop a continuously updated tool for monitoring e.g. antimicrobial susceptibility that displays results from the previous four weeks as well as annual results. The user could be able to filter results based on dataset parameters.
+
+Insight
+This is not a basic business intelligence (BI) dashboard task for laboratory data e.g. for
+
+antimicrobial resistance surveillance, that's too easy and won't create real value. The hard
+
+part is making a continuously updated tool which is highly usable and versatile for the end-
+
+user. An AI-native approach is one possible angle here but not the only possible one.
+
+Resources
+You have a fully synthetic microbiology laboratory dataset (synthetic_microbiology_dataset.zip): 10,000 invented patients and about 47,000 urine, blood and wound cultures over three years from nine wards or health centres. • Structure of the dataset: patients → cultures (sample) → isolates (organism found) → susceptibility (S/R). Join on patient_id, culture_id and isolate_id. • Opening: CSV, UTF-8, comma-separated. In Excel: Data → From Text/CSV. • Tips: compute resistance percentages from the first isolate per patient and use at least 30 isolates. See the README inside the zip file for more information. • The approach and tools are up to you. • Useful links to existing AMR surveillance networks and their tools o European surveillance data https://www.ecdc.europa.eu/en/about- us/networks/disease-networks-and-laboratory-networks/ears-net-data o Finnish surveillance data https://thl.fi/en/data-and-statistics/infectious- diseases/antimicrobial-resistance#development-of-antimicrobial-resistance- in-finland
+
+Company Info
+
+Tyks Laboratories
+Judging Criteria
+Demonstrated understanding of the challenge
+(25%)
+The overall suitability of the solution in relation to the challenge description and the insight
+(25%)
+Usability of the solution
+(25%)
+The solution is capable of detecting deviations and anomalies in the data
+(25%)
+Prizes
+1st
+1400€
+
+2nd
+350€
+
+3rd
+250€
