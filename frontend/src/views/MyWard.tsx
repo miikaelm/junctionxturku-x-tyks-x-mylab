@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type OrganismRow, type Specimen, type SplitBy } from "../api/client";
-import { AlertStrip } from "../components/AlertStrip";
 import { Antibiogram } from "../components/Antibiogram";
 import { CellDetail } from "../components/CellDetail";
 import { FilterBar, type Filters } from "../components/FilterBar";
@@ -9,6 +8,7 @@ import { FreshnessBadge } from "../components/FreshnessBadge";
 import { Legend } from "../components/Legend";
 import { SubgroupPanel } from "../components/SubgroupPanel";
 import { TherapyHelper } from "../components/TherapyHelper";
+import { WardExceptions } from "../components/WardExceptions";
 import { fmtDate } from "../lib/format";
 import { useFetch, useLocalStorage } from "../lib/hooks";
 import { useApp } from "../state/AppContext";
@@ -19,12 +19,19 @@ const SPECIMEN_LABEL: Record<Specimen, string> = {
   wound: "Wound",
 };
 
-/** V1 My Ward: the clinician's landing page (VIEW-01). */
-export function MyWard() {
-  const { meta, asOf } = useApp();
+/**
+ * V1 My Ward: the clinician's landing page (VIEW-01). Exceptions first (UX-05): what not to use
+ * and what is going on here; the ranked coverage and the full antibiogram follow below.
+ */
+export function MyWard({ ward }: { ward?: string }) {
+  const { meta, asOf, role } = useApp();
   const knownLocations = new Set([...meta.wards.map((w) => w.ward_code), ...meta.locations.map((l) => l.code)]);
   const [storedLocation, setLocation] = useLocalStorage("aei.location", meta.wards[0].ward_code);
   const location = knownLocations.has(storedLocation) ? storedLocation : meta.wards[0].ward_code;
+  // Opened from the drill-down (#/ward/URO): show that ward.
+  useEffect(() => {
+    if (ward && knownLocations.has(ward)) setLocation(ward);
+  }, [ward]); // eslint-disable-line react-hooks/exhaustive-deps
   const [specimen, setSpecimen] = useLocalStorage<Specimen>("aei.specimen", "urine");
   const [filters, setFilters] = useState<Filters>({});
   const [selected, setSelected] = useState<{ organism: string; code: string; sub?: string } | null>(null);
@@ -54,17 +61,14 @@ export function MyWard() {
     <>
       <section className="ward-head">
         <div>
-          <p className="eyebrow">My ward</p>
+          <p className="eyebrow">{role.role === "clinician" && role.ward === location ? "My ward" : "Ward"}</p>
           <h1>{data?.scope.label ?? "…"}</h1>
           <p className="ward-sub">
-            {SPECIMEN_LABEL[specimen]} cultures · resistance among first isolates · as of{" "}
-            {fmtDate(asOf)}
+            {SPECIMEN_LABEL[specimen]} cultures · as of {fmtDate(asOf)}
           </p>
         </div>
         <FreshnessBadge freshness={fresh.data} location={location} />
       </section>
-
-      <AlertStrip location={location} />
 
       <FilterBar
         location={location}
@@ -75,6 +79,9 @@ export function MyWard() {
         onFilters={setFilters}
       />
 
+      <WardExceptions location={location} specimen={specimen} filters={filters} freshness={fresh.data} />
+
+      <h2 className="section-title detail-title">More detail</h2>
       <TherapyHelper location={location} specimen={specimen} filters={filters} />
 
       {ab.error && <p className="error">Could not load the antibiogram: {ab.error}</p>}

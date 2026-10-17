@@ -25,7 +25,7 @@ export interface Meta {
   specimens: Specimen[];
   organisms: string[];
   age_bands: string[];
-  alert_types: { key: AlertType; label: string; severity: Severity; routine: boolean }[];
+  alert_types: { key: AlertType; label: string; severity: Severity; routine: boolean; action: string | null }[];
   severities: Severity[];
   triage_statuses: TriageStatus[];
   home_areas: string[];
@@ -36,6 +36,7 @@ export interface Meta {
   intrinsic: Record<string, string[]>;
   antibiotics: { code: string; name: string; reported_for: string }[];
   infections: { key: Infection; label: string; specimen: Specimen }[];
+  varha: { label: string; full: string; hospital: { key: string; label: string; full: string } };
   thresholds: {
     min_isolates: number;
     good_below: number;
@@ -704,6 +705,127 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
 
 const post = <T,>(path: string, body: unknown) => send<T>("POST", path, body);
 
+// ---------- Exceptions first (slice 5) ----------
+
+export interface AnomalyAlert {
+  id: string;
+  type: AlertType;
+  type_label: string;
+  severity: Severity;
+  title: string;
+  wards: string[];
+  first_seen: string;
+  last_seen: string;
+  onset: string;
+  triage: TriageStatus;
+}
+
+export interface AnomalyTotals {
+  anomalies: number;
+  alerts: number;
+  feed_problems: number;
+  new: number;
+  by_severity: Partial<Record<Severity, number>>;
+  worst: Severity | null;
+  calm: string[];
+  carriers: number;
+}
+
+export interface WardAnomalies {
+  ward_code: string;
+  label: string;
+  institution: "hospital" | "primary_care";
+  alerts: AnomalyAlert[];
+  feed: {
+    status: "delayed" | "stale" | "no_data" | "gap";
+    last_sample: string | null;
+    days_since_last: number | null;
+    alert: AnomalyAlert | null;
+  } | null;
+  carriers: number;
+  anomalies: number;
+  new: number;
+  worst: Severity | null;
+}
+
+export interface InstitutionAnomalies extends AnomalyTotals {
+  key: string;
+  label: string;
+  full: string;
+  kind: "hospital" | "health_centre";
+  wards: string[];
+}
+
+export interface Anomalies {
+  as_of: string;
+  varha: AnomalyTotals & { label: string; full: string };
+  institutions: InstitutionAnomalies[];
+  placeholders: string[];
+  wards: Record<string, WardAnomalies>;
+  definition: string;
+}
+
+export type AvoidStatus = "above" | "below" | "intrinsic" | "not_tested" | "too_few";
+
+export interface AvoidOrganism {
+  organism: string;
+  share: number;
+  status: AvoidStatus;
+  level?: Level;
+  level_label?: string;
+  fell_back?: boolean;
+  n?: number;
+  r?: number;
+  pct?: number;
+  ci_low?: number;
+  ci_high?: number;
+  direction?: "rising" | "stable" | "easing" | null;
+  since?: { date: string; at_least: boolean };
+}
+
+/** A short-term rise from an active resistance-shift alert, not yet in the 12-month figures. */
+export interface RecentRise {
+  code: string;
+  organism: string;
+  observed: Estimate;
+  expected: Estimate;
+  window: { start: string; end: string };
+  since: string;
+  alert_id: string;
+  ward: string;
+}
+
+export interface AvoidAgent {
+  code: string;
+  name: string;
+  class: string;
+  reserve: boolean;
+  organisms: AvoidOrganism[];
+  affected_share?: number;
+  worst_pct?: number;
+  since?: string;
+  since_at_least?: boolean;
+  recent_rise?: RecentRise | null;
+}
+
+export interface Avoid {
+  as_of: string;
+  infection: Infection;
+  infection_label: string;
+  specimen: Specimen;
+  window: { start: string; end: string };
+  isolates: number;
+  organisms_from: { level: Level; label: string; fell_back: boolean };
+  main_organisms: { organism: string; share: number }[];
+  threshold_pct: number;
+  avoid: AvoidAgent[];
+  recent_rise: (AvoidAgent & { rise: RecentRise })[];
+  no_warning: AvoidAgent[];
+  not_suited: AvoidAgent[];
+  unknown: AvoidAgent[];
+  method: string;
+}
+
 export const api = {
   health: () => get<Health>("/health"),
   meta: () => get<Meta>("/meta"),
@@ -731,6 +853,8 @@ export const api = {
   overview: (q: OverviewQuery, signal?: AbortSignal) => get<Overview>("/overview", { ...q }, signal),
   ingestHeldBack: (days: number) => post<IngestEntry>(`/ingest/held-back?days=${days}`, {}),
   therapy: (q: TherapyQuery, signal?: AbortSignal) => get<Therapy>("/therapy", { ...q }, signal),
+  avoid: (q: TherapyQuery, signal?: AbortSignal) => get<Avoid>("/avoid", { ...q }, signal),
+  anomalies: (as_of: string, signal?: AbortSignal) => get<Anomalies>("/anomalies", { as_of }, signal),
   carriers: (q: { as_of: string; location?: string; phenotype?: string; days?: number; limit?: number }, signal?: AbortSignal) =>
     get<Carriers>("/carriers", { ...q }, signal),
   patient: (id: string, as_of: string, signal?: AbortSignal) =>

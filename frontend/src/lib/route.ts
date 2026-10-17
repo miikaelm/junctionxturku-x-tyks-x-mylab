@@ -3,11 +3,12 @@ import { useEffect, useState } from "react";
 /** Minimal hash routing, so views can be linked to and the back button works. */
 export type Route =
   | { view: "start" }
-  | { view: "ward" }
+  | { view: "ward"; id?: string }
+  | { view: "area"; id?: string }
   | { view: "alerts" }
   | { view: "alert"; id: string }
   | { view: "feed" }
-  | { view: "overview" }
+  | { view: "heatmap" }
   | { view: "trends" }
   | { view: "spread" }
   | { view: "patients" }
@@ -15,7 +16,7 @@ export type Route =
   | { view: "notifications" }
   | { view: "ehr"; id?: string };
 
-const SIMPLE = ["start", "feed", "overview", "trends", "spread", "patients", "notifications"] as const;
+const SIMPLE = ["start", "feed", "heatmap", "trends", "spread", "patients", "notifications"] as const;
 
 export function parseHash(hash: string): Route {
   const [view, id] = hash.replace(/^#\/?/, "").split("/");
@@ -24,6 +25,9 @@ export function parseHash(hash: string): Route {
   if (view === "alerts") return { view: "alerts" };
   if (view === "patients" && key) return { view: "patient", id: key };
   if (view === "ehr") return { view: "ehr", id: key };
+  if (view === "area") return { view: "area", id: key };
+  if (view === "overview") return { view: "area" }; // the old name of the drill-down's place
+  if (view === "ward") return { view: "ward", id: key };
   if ((SIMPLE as readonly string[]).includes(view)) return { view } as Route;
   return { view: "ward" };
 }
@@ -31,7 +35,9 @@ export function parseHash(hash: string): Route {
 export function href(route: Route): string {
   if (route.view === "alert") return `#/alerts/${encodeURIComponent(route.id)}`;
   if (route.view === "patient") return `#/patients/${encodeURIComponent(route.id)}`;
-  if (route.view === "ehr") return route.id ? `#/ehr/${encodeURIComponent(route.id)}` : "#/ehr";
+  if ((route.view === "ehr" || route.view === "area" || route.view === "ward") && route.id) {
+    return `#/${route.view}/${encodeURIComponent(route.id)}`;
+  }
   return `#/${route.view}`;
 }
 

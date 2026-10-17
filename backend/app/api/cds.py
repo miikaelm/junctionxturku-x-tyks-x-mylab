@@ -2,8 +2,9 @@
 
 The patient record or prescribing system calls a *service* at a defined moment and shows the
 short *cards* it returns:
-  - `aei-antibiotic-choice` (hook `order-select`): an antibiotic is being ordered → local
-    coverage for this infection on this ward, better choices, active alerts on the ward;
+  - `aei-antibiotic-choice` (hook `order-select`): an antibiotic is being ordered → whether
+    to avoid it for this infection on this ward (UX-05), alternatives without a warning, active
+    alerts on the ward;
   - `aei-patient-context` (hook `patient-view`): a patient record is opened → carrier flags
     and alerts the patient is part of.
 
@@ -21,11 +22,13 @@ from pydantic import BaseModel, Field
 
 from app import config
 from app.alerts import engine
+from app.alerts.anomalies import recent_rises
 from app.alerts.triage import get_triage_store
 from app.api.routes import AsOf, resolve_as_of
 from app.data.dataset import get_dataset
 from app.data.scope import Scope
 from app.patients.registry import patient_record
+from app.stats.avoid import avoid, with_recent_rises
 from app.stats.therapy import therapy
 
 router = APIRouter(prefix="/api/cds-services", tags=["CDS Hooks"])
@@ -35,8 +38,9 @@ SERVICES = [
         "hook": "order-select",
         "id": "aei-antibiotic-choice",
         "title": "AEI: local resistance for an antibiotic order",
-        "description": "When an antibiotic is chosen: how often it would cover this infection on "
-        "this ward right now, the best-covering alternatives and active resistance alerts.",
+        "description": "When an antibiotic is chosen: whether there is a local reason not to "
+        "use it for this infection on this ward (resistance at or above 20 %, since when), "
+        "alternatives without a warning and active alerts on the ward.",
         "prefetch": {},
     },
     {
@@ -194,6 +198,9 @@ def order_select(context: dict, as_of: date) -> list[dict]:
     result = therapy(ds, scope, infection, as_of)
 
     chosen = _antibiotic(context)
+    flags = avoid(ds, scope, infection, as_of)
+    rises = recent_rises(ds, as_of, get_triage_store(), {ward}, flags["specimen"])
+    flags = with_recent_rises(flags, rises)
     cards = []
     where = result["used"]["label"]
     basis = (
@@ -202,12 +209,61 @@ def order_select(context: dict, as_of: date) -> list[dict]:
         + (" (too few on the ward itself)" if result["used"]["fell_back"] else "")
         + "."
     )
+    label = result["infection_label"].lower()
+    flagged = {x["code"]: x for x in flags["avoid"]}
+    unsuited = {x["code"]: x for x in flags["not_suited"]}
+    risen = {x["code"]: x for x in flags["recent_rise"]}
     items = {x["code"]: x for x in result["ranked"] + result["unranked"]}
-    if chosen and chosen in items:
+    names = ds.antibiotics.set_index("antibiotic_code").antibiotic
+
+    if chosen in flagged:
+        x = flagged[chosen]
+        above = [o for o in x["organisms"] if o["status"] == "above"]
+        cards.append(
+            card(
+                f"Avoid {x['name']} for a {label} on {ward}: "
+                + "; ".join(f"{o['organism']} {o['pct']:g} % resistant" for o in above),
+                "critical" if x["affected_share"] >= 0.5 else "warning",
+                "| Organism | Share of infections | Resistant | Above 20 % since | Trend |\n"
+                "|---|---|---|---|---|\n"
+                + "\n".join(
+                    f"| {o['organism']} | {round(100 * o['share'])} % | {o['pct']:g} % "
+                    f"({o['r']}/{o['n']}{', ' + o['level_label'] if o['fell_back'] else ''}) | "
+                    f"{'at least ' if o['since']['at_least'] else ''}{o['since']['date']} | "
+                    f"{o['direction'] or '–'} |"
+                    for o in above
+                )
+                + f"\n\n{flags['method']} Decision support, not a prescription.",
+                [link("Open My Ward in AEI", "ward")],
+            )
+        )
+    elif chosen in risen:
+        x, r = risen[chosen], risen[chosen]["rise"]
+        cards.append(
+            card(
+                f"{x['name'].capitalize()}: resistance has risen on {ward} in the last 4 weeks",
+                "warning",
+                f"{r['organism']} ({flags['specimen']}): {r['observed']['pct']:g} % resistant "
+                f"({r['observed']['r']}/{r['observed']['n']}) from {r['window']['start']} to "
+                f"{r['window']['end']}, against {r['expected']['pct']:g} % in the 12 months before. "
+                f"Alert raised {r['since']}. The 12-month figure is still below "
+                f"{flags['threshold_pct']:g} %, so this is a recent change. Decision support, "
+                "not a prescription.",
+                [link("Open the alert in AEI", f"alerts/{r['alert_id']}")],
+            )
+        )
+    elif chosen in unsuited:
+        x = unsuited[chosen]
+        intrinsic = [o["organism"] for o in x["organisms"] if o["status"] == "intrinsic"]
+        cards.append(
+            card(
+                f"{x['name'].capitalize()} does not act on most {label} organisms",
+                "warning",
+                f"Intrinsically resistant: {', '.join(intrinsic)}.",
+            )
+        )
+    elif chosen and chosen in items:
         x = items[chosen]
-        indicator = {"good": "info", "warn": "warning", "bad": "warning"}[x["tier"]]
-        if x["coverage_pct"] < 50:
-            indicator = "critical"
         rows = "\n".join(
             f"| {p['organism']} | {round(100 * p['share'])} % | "
             + (
@@ -222,38 +278,54 @@ def order_select(context: dict, as_of: date) -> list[dict]:
         )
         cards.append(
             card(
-                f"{x['name'].capitalize()}: covers ~{round(x['coverage_pct'])} % of "
-                f"{result['infection_label'].lower()}s on {ward}",
-                indicator,
-                f"95 % interval {x['ci_low']}–{x['ci_high']} %. {basis}\n\n"
+                f"No local resistance warning for {x['name']} ({label}, {ward})",
+                "info",
+                f"No main organism is {flags['threshold_pct']:g} % or more resistant. Estimated "
+                f"coverage ~{round(x['coverage_pct'])} % (95 % interval {x['ci_low']}–"
+                f"{x['ci_high']} %). {basis}\n\n"
                 f"| Likely organism | Share | {x['name'].capitalize()} |\n|---|---|---|\n{rows}\n\n"
                 "Untested organisms count as not covered. Decision support, not a prescription.",
                 [link("Open My Ward in AEI", "ward")],
             )
         )
     elif chosen:
-        name = ds.antibiotics.set_index("antibiotic_code").antibiotic[chosen]
         cards.append(
             card(
-                f"No local data on {name} for {result['infection_label'].lower()}s",
+                f"No local data on {names[chosen]} for {label}s",
                 "info",
-                f"{name.capitalize()} is not reported for {result['specimen']} cultures. {basis}",
+                f"{names[chosen].capitalize()} is not reported for {result['specimen']} cultures. "
+                f"{basis}",
             )
         )
 
-    best = result["ranked"][:3]
-    if best and (chosen is None or chosen not in {b["code"] for b in best}):
+    if chosen is None and flagged:
         cards.append(
             card(
-                f"Best coverage on {ward}: "
-                + ", ".join(f"{b['name']} {round(b['coverage_pct'])} %" for b in best),
-                "info",
-                f"Ranked by estimated coverage of {result['infection_label'].lower()}s. {basis} "
-                "Choose by the local guideline: broad agents such as meropenem rank high by "
-                "coverage but are reserved.",
-                [link("Therapy helper in AEI", "ward")],
+                f"Avoid for a {label} on {ward}: " + ", ".join(x["name"] for x in flagged.values()),
+                "warning",
+                flags["method"],
+                [link("Open My Ward in AEI", "ward")],
             )
         )
+    if chosen in flagged or chosen in unsuited or chosen in risen:
+        clear = {x["code"] for x in flags["no_warning"]}
+        best = [b for b in result["ranked"] if b["code"] in clear][:3]
+        if best:
+            cards.append(
+                card(
+                    "Without a local warning: "
+                    + ", ".join(
+                        f"{b['name']} (~{round(b['coverage_pct'])} %"
+                        + (", reserve" if b["reserve"] else "")
+                        + ")"
+                        for b in best
+                    ),
+                    "info",
+                    f"Ranked by estimated coverage of {label}s. {basis} Choose by the local "
+                    "guideline: reserve agents such as meropenem are kept for resistant infections.",
+                    [link("Therapy helper in AEI", "ward")],
+                )
+            )
 
     alerts = [
         a

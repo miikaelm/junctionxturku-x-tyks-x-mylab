@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Meta, Role } from "../api/client";
 import { ROLES, type RoleSetting } from "../lib/roles";
-import { href, type Route } from "../lib/route";
+import { href } from "../lib/route";
 
 /** Role-based entry (VIEW-08): choose a role and land on its home view. */
 export function RolePicker({
@@ -24,7 +24,7 @@ export function RolePicker({
       }
     }
     onPick(setting);
-    window.location.hash = href({ view: ROLES[role].home } as Route);
+    window.location.hash = href(ROLES[role].home);
   };
 
   return (
@@ -57,7 +57,7 @@ export function RolePicker({
                 </label>
               )}
               <p className="muted small">
-                Opens on: {r.nav.find((n) => n.view === r.home)?.label}
+                Opens on: {r.homeLabel}
                 {r.patientLevel ? " · sees patient-level data" : " · aggregates only"}
               </p>
               <button type="button" className="btn btn-primary" onClick={() => pick(key)}>

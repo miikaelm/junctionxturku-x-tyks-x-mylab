@@ -8,12 +8,13 @@ import type { RoleSetting } from "./lib/roles";
 import { useHashRoute } from "./lib/route";
 import { AppContext } from "./state/AppContext";
 import { AlertDetailView } from "./views/AlertDetail";
+import { Area } from "./views/Area";
 import { AlertInbox } from "./views/AlertInbox";
 import { FeedStatus } from "./views/FeedStatus";
 import { MockEhr } from "./views/MockEhr";
 import { MyWard } from "./views/MyWard";
 import { Notifications } from "./views/Notifications";
-import { Overview } from "./views/Overview";
+import { Heatmap } from "./views/Heatmap";
 import { PatientView, Patients } from "./views/Patients";
 import { RolePicker } from "./views/RolePicker";
 import { Spread } from "./views/Spread";
@@ -109,14 +110,9 @@ export default function App() {
   }
   if (!meta || !asOf) return <div className="boot">Loading…</div>;
 
-  // A clinician's badge counts new alerts on their own ward, routine ones included (they are
-  // about that ward's patients); the other roles count new non-routine alerts (NOTIF-03).
-  const badge =
-    role?.role === "clinician"
-      ? (alerts.data?.alerts ?? []).filter(
-          (a) => a.state === "active" && a.triage.status === "new" && a.wards.includes(role.ward ?? ""),
-        ).length
-      : (alerts.data?.counts.new ?? 0);
+  // Clinicians get no badge (UX-06): their ward's alerts are part of My Ward. The other roles
+  // count new non-routine alerts (NOTIF-03).
+  const badge = role?.role === "clinician" ? null : (alerts.data?.counts.new ?? 0);
   const picking = !role || route.view === "start";
 
   return (
@@ -146,10 +142,11 @@ export default function App() {
           <Header route={route} badge={badge} />
           <ReplayBar settings={replay} onSettings={setReplay} />
           <main className="page">
-            {route.view === "ward" && <MyWard />}
+            {route.view === "ward" && <MyWard ward={route.id} />}
+            {route.view === "area" && <Area id={route.id} />}
             {route.view === "alerts" && <AlertInbox />}
             {route.view === "alert" && <AlertDetailView id={route.id} />}
-            {route.view === "overview" && <Overview />}
+            {route.view === "heatmap" && <Heatmap />}
             {route.view === "trends" && <Trends />}
             {route.view === "feed" && <FeedStatus />}
             {route.view === "spread" && <Spread />}

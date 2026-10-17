@@ -280,3 +280,39 @@ UI_BASE_URL = os.environ.get("AEI_UI_URL", "http://localhost:5173")
 API_BASE_URL = os.environ.get("AEI_API_URL", "http://localhost:8000")
 WEBHOOK_TIMEOUT_SECONDS = 5
 DIGEST_PERIODS = {"week": 7, "month": 30}
+
+# --- Usability phase (slice 5) --------------------------------------------------------------
+
+# Clinician "what not to use" list (UX-05). An agent is flagged for an infection when, in the
+# last 12 months, one of the infection's main organisms (at least AVOID_MIN_ORGANISM_SHARE of
+# first isolates) is resistant at or above EMPIRICAL_THRESHOLD_PCT, with n ≥ 30 at the most
+# specific location level that has them (STAT-04). Based on resistance, not WISCA coverage:
+# untested organisms (E. faecalis) would cap coverage for nearly every agent.
+AVOID_MIN_ORGANISM_SHARE = 0.10
+# Agents most of the infection's organisms resist intrinsically are "not suited", not "no warning".
+AVOID_NOT_SUITED_SHARE = 0.5
+# "Since when": the 12-month rate is recomputed at monthly steps back from the as-of date; the
+# flag has held since the earliest step of the unbroken run above the limit up to today.
+AVOID_SINCE_STEP_DAYS = 30
+AVOID_SINCE_MAX_STEPS = 36
+# Direction: last 12 months vs the 12 months before (Fisher exact), at least this many points.
+AVOID_DIRECTION_MIN_PP = 5.0
+AVOID_DIRECTION_ALPHA = 0.05
+# What to do, per alert type, in the clinician's exceptions list (UX-05).
+ALERT_ACTIONS = {
+    "sentinel": "Contact precautions for the patient; infection control will advise.",
+    "cluster": "Contact precautions for affected patients; infection control is investigating.",
+    "multi_ward": "Contact precautions; infection control is tracing it between wards.",
+    "rate_shift": "Resistance has risen here: check the avoid list before choosing empirically.",
+    "novelty": "Unusual finding for this ward: infection control will review it.",
+    "carrier": "Known carrier: contact precautions while on the ward.",
+    "data_gap": "Lab data from here has stopped arriving: figures may be out of date.",
+}
+
+# Varha drill-down (UX-01/03): Varha → institution → ward. Hospital wards form one institution;
+# each health centre is an institution of its own. Other Varha hospitals are not in the demo
+# data and are shown as greyed placeholders.
+VARHA_LABEL = "Varha"
+VARHA_FULL = "Southwest Finland wellbeing services county"
+VARHA_HOSPITAL = {"key": "tyks", "label": "Tyks", "full": "Turku University Hospital"}
+VARHA_PLACEHOLDERS = ["Loimaa hospital", "Vakka-Suomi hospital", "Salo hospital"]

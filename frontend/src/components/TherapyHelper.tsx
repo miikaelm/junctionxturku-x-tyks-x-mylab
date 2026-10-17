@@ -13,7 +13,7 @@ const INFECTION_OF: Record<Specimen, Infection> = { urine: "uti", blood: "bloods
  */
 export function TherapyHelper({ location, specimen, filters }: { location: string; specimen: Specimen; filters: Filters }) {
   const { meta, asOf } = useApp();
-  const [open, setOpen] = useLocalStorage("aei.therapy.open", true);
+  const [open, setOpen] = useLocalStorage("aei.therapy.ranking.open", false);
   const [detail, setDetail] = useState<string | null>(null);
   const infection = INFECTION_OF[specimen];
   const { data, error, loading } = useFetch(
@@ -35,11 +35,11 @@ export function TherapyHelper({ location, specimen, filters }: { location: strin
     <section className={`card pad therapy ${loading ? "is-loading" : ""}`}>
       <div className="therapy-head">
         <h2>
-          Best choices for a {label.toLowerCase()}
+          Coverage ranking for a {label.toLowerCase()}
           {who.length > 0 && <span className="muted"> · {who.join(", ")}</span>}
         </h2>
         <button type="button" className="link-btn" onClick={() => setOpen(!open)}>
-          {open ? "Hide" : "Show the therapy helper"}
+          {open ? "Hide" : "Show"}
         </button>
       </div>
       {open && error && <p className="error">Could not load the therapy helper: {error}</p>}

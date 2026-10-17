@@ -12,8 +12,8 @@ const SPANS = [
   { key: "12q", label: "3 years, quarters (13 weeks)", bins: 12, days: 91 },
 ];
 
-/** V5 Ward × time overview: where and when things changed, with the alerts raised there. */
-export function Overview() {
+/** V5 Ward × time heatmap: where and when things changed, with the alerts raised there. */
+export function Heatmap() {
   const { meta, asOf } = useApp();
   const [metric, setMetric] = useLocalStorage("aei.overview.metric", "phenotype:ESBL");
   const isRate = metric.startsWith("rate:");
@@ -44,8 +44,8 @@ export function Overview() {
     <>
       <section className="ward-head">
         <div>
-          <p className="eyebrow">Infection control</p>
-          <h1>Ward × time overview</h1>
+          <p className="eyebrow">Ward × time</p>
+          <h1>Heatmap</h1>
           <p className="ward-sub">Every ward side by side, latest on the right · as of {fmtDate(asOf)}</p>
         </div>
       </section>

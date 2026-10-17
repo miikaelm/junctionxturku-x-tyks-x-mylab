@@ -222,7 +222,8 @@ def test_cds_hooks_services(client):
         },
     ).json()["cards"]
     summaries = [c["summary"] for c in cards]
-    assert summaries[0].startswith("Ciprofloxacin: covers")
+    # The 12-month CIP figure is still below 20 % then, but a resistance shift is active (slice 5)
+    assert summaries[0].startswith("Ciprofloxacin: resistance has risen on URO")
     assert any("ESBL cluster" in s for s in summaries)  # the E1 outbreak, active that day
     assert all(c["indicator"] in ("info", "warning", "critical") and c["source"] for c in cards)
 

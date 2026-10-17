@@ -81,25 +81,26 @@ Three primary roles (keep it to ~3; confirm with the mentor, see §10.1).
 
 | # | Role | Who | Main question | How often | Home view |
 |---|---|---|---|---|---|
-| R1 | **Clinician** | Ward / on-call doctor; also health-centre GPs (same needs, urine-first) | "My patient has an infection. Which antibiotic is likely to work on my ward right now?" | Daily, seconds, under time pressure | V1 |
-| R2 | **Infection control** | Infection-control nurse / hygienist, infection physician | "Is something spreading? Which wards, which patients?" | Daily morning check + on alert | V3 |
-| R3 | **Lab & stewardship** | Clinical microbiologist (Tyks lab). Secondary uses: long-term trends / guideline review (stewardship), annual reporting | "Are alerts real? Is data arriving? What are the long-term trends? What do I report?" | Daily–quarterly | V7 / V6 |
+| R1 | **Clinician** | Ward / on-call doctor; also health-centre GPs (same needs, urine-first) | "Is there a reason not to use the antibiotic I have in mind, on my ward, now?" | Daily, seconds, under time pressure | V1 |
+| R2 | **Infection control** | Infection-control nurse / hygienist, infection physician | "Is something spreading? Which wards, which patients?" | Daily morning check + on alert | V12 (Tyks level) |
+| R3 | **Lab & stewardship** | Clinical microbiologist (Tyks lab). Secondary uses: long-term trends / guideline review (stewardship), annual reporting | "Are alerts real? Is data arriving? What are the long-term trends? What do I report?" | Daily–quarterly | V12 (Varha level) |
 
 ### Views
 
 | ID | View | For | Purpose |
 |---|---|---|---|
-| V1 | **My Ward** (landing page for R1) | R1 | Organism × antibiotic table for the selected ward and specimen. **Last 4 weeks next to last 12 months.** Traffic-light colouring, counts, uncertainty, "insufficient data" state. Ward remembered between visits. Contains: the **therapy-helper mode** (V2), an **alert strip for this ward** (from V3), and a **data-freshness badge** (from V7). Visual quality is a priority here. |
+| V1 | **My Ward** (landing page for R1) | R1 | **Exceptions first (UX-05):** what *not* to use for this infection here (since when, direction, n; recent rises from active alerts) and what is going on on the ward (alerts with since when and what to do). Below, under "More detail": the coverage ranking (V2) and the organism × antibiotic table, **last 4 weeks next to last 12 months**, with counts, uncertainty and an "insufficient data" state. Ward remembered between visits; data-freshness badge (from V7). |
 | V2 | **Therapy-helper mode** (inside V1, not a separate page) | R1 | Pick infection type (UTI / bloodstream / wound) + patient context (sex, age, hospital-acquired?) → a ranked "best choices" strip above the table, by probability of covering the likely organisms. Same logic powers the AI assistant (AI-01) and the API (API-02). Decision support, not a prescription. |
 | V3 | **Alert inbox** (home for R2) | R2, R3 | All active alerts with type, severity, ward, first-seen date and triage status (new / investigating / confirmed / dismissed). R1 sees only their ward's alerts, as the strip in V1. |
 | V4 | **Alert detail / outbreak investigation** | R2, R3 | Case timeline, line list of cases (date, ward, specimen, days since admission), resistance-profile similarity between cases, and why the alert fired (baseline vs observed). |
-| V5 | **Ward × time overview** | R2 | Heatmap of wards × weeks for phenotype counts (MRSA/ESBL/CPE/VRE) and key resistance rates. Shows at a glance where and when things changed. |
+| V5 | **Ward × time heatmap** | R2, R3 | Heatmap of wards × weeks for phenotype counts (MRSA/ESBL/CPE/VRE) and key resistance rates. Shows at a glance where and when things changed. |
 | V6 | **Trend explorer & reports** (separate "not daily" workflow) | R3 | Long-term trends by organism–antibiotic, with guideline thresholds (e.g. 20 % line), period comparisons (year vs year), and annual-report export. |
 | V7 | **Data quality / feed status** | R3 | Sample volume per ward per day vs expected, gaps, last-received dates. Freshness also appears as a badge on every other view (VIEW-12). |
 | V8 | **Time cursor / replay control** (global header) | All, demo | Sets the "as-of" date. Every view and alert recomputes as if it were that day. |
 | V9 | **AI assistant panel** | All | Natural-language questions and plain-language alert explanations. |
 | V10 | **Spread / footprint view** | R2 | For a chosen organism, phenotype or resistance profile: where it appears across wards over time, which wards share the same profile, and where the patients from a cluster went afterwards (PAT-03). |
 | V11 | **Mock patient-record (EHR) page** (demo) | Demo | A fake "doctor's main system" screen that calls our API and shows the returned cards (API-05). |
+| V12 | **Overview drill-down** (home for R2, R3) | R2, R3 | Varha → institution → ward, exceptions only (UX-02/03): anomaly counts per child, the calm ones on one line, other Varha hospitals as placeholders. The ward level lists its anomalies with what to do, and keeps background (carriers, the avoid list, the full antibiogram) one click away. |
 
 ---
 
@@ -156,7 +157,7 @@ All detectors run automatically on every update (or as-of change) with general m
 - [x] **VIEW-06 (M)** V6 Trend explorer, with threshold lines and year-vs-year comparison.
 - [x] **VIEW-07 (M)** V7 Data quality / feed status.
 - [x] **VIEW-08 (S)** Role-based entry: choose one of the 3 roles → land on that role's home view.
-- [~] **VIEW-09 (S)** Clinician-first UX: core answer reachable in ≤ 2 clicks, readable on a tablet or phone, plain-language labels, consistent colour meaning (green = likely effective, red = high resistance, grey = insufficient data).
+- [x] **VIEW-09 (S)** Clinician-first UX: core answer reachable in ≤ 2 clicks, readable on a tablet or phone, plain-language labels, consistent colour meaning. **Colour means action** (UX-02): red = high resistance / urgent, amber = borderline or a recent rise, no colour = fine, grey = insufficient data.
 - [ ] **VIEW-10 (C)** Finnish / English language toggle (the data already contains Finnish names). Optional.
 - [ ] **VIEW-11 (C)** Export: annual report (PDF/CSV).
 - [~] **VIEW-12 (M)** **Data-freshness badge on every view** (e.g. "PHC-S: last sample 7 days ago ⚠") so "no data" is never mistaken for "no resistance".
@@ -232,26 +233,28 @@ This phase reworks *how* the data is presented, per role. Decide the approach be
   the wellbeing services county (§1): which levels exist (Varha area → institution / hospital → ward),
   whether we need extension data (EXT-02) to show more than one hospital, and how the pitch positions
   it (mentor question in §10.1). Output: a design decision in §9 before any code. **Decided, see §9.**
-- [ ] **UX-02 (S)** **Exceptions-first view for infection control (R2):** open on what is abnormal
+- [x] **UX-02 (S)** **Exceptions-first view for infection control (R2):** open on what is abnormal
   instead of the full antibiogram. An *anomaly* is an active alert or a feed problem; chronic red cells
   are not anomalies (they go to the ward's "avoid" list, UX-05). Normal data stays reachable one step
   deeper ("show all"), not up front. The anomaly *is* the alert: clicking it opens V4.
-- [ ] **UX-03 (S)** **Drill-down hierarchy for big-picture users (R2, R3):** Varha → institution (Tyks,
+- [x] **UX-03 (S)** **Drill-down hierarchy for big-picture users (R2, R3):** Varha → institution (Tyks,
   PHC-N, PHC-S) → ward. Higher levels show **counts of anomalies, never an overall resistance %**, and
   list only the children that have anomalies, plus one quiet line naming the calm ones ("4 wards calm:
   …"). Clicking a child drills down; same page template at every level. Other Varha hospitals appear as
   greyed placeholders ("not in demo data"). Home area is a separate community lens, not a level.
-- [ ] **UX-05 (S)** **Clinician exceptions view (R1):** My Ward opens on what *not* to use and what is
+- [x] **UX-05 (S)** **Clinician exceptions view (R1):** My Ward opens on what *not* to use and what is
   going on on the ward, nothing else up front. Each "avoid" line: agent, infection, % resistant with n
   (e.g. 40/130), **since when** above the threshold, and direction (rising / stable / easing). Based on
   resistance in the organisms the agent targets, not on WISCA coverage. Ward alerts (clusters etc.) with
   since when and what to do; known carriers sampled as a quiet count. The ranked therapy helper and full
   antibiogram move further down. No badge, no notifications for clinicians.
-- [ ] **UX-06 (S)** **Notifications as delivery settings:** alerts are the first-party object in the
+- [x] **UX-06 (S)** **Notifications as delivery settings:** alerts are the first-party object in the
   app; notifications are only how people hear about them outside it. The Notifications page moves from
   the main nav to a settings (⚙) entry (subscriptions, channels, delivery log, digest).
-- [ ] **UX-04 (S)** **Visual polish pass:** consistent look across all views, animations, responsive
-  layouts, role-specific landing pages (with VIEW-08). V1 got an early polish in slice 1.
+- [~] **UX-04 (S)** **Visual polish pass:** consistent look across all views, animations, responsive
+  layouts, role-specific landing pages (with VIEW-08). V1 got an early polish in slice 1. Slice 5 did the
+  new views (drill-down animation, tiles, phone width for My Ward and the overview, quiet "fine" cells);
+  the older views (alert detail, trends, spread, feed, carriers, mock EHR) still have slice 2–4 styling.
 
 ---
 
@@ -346,6 +349,12 @@ K. pneumoniae TMP (14 % → 32 %) has its whole interval above 20 %, the rest ar
 | E6 | Carrier registry (PAT-01): 491 ESBL, 110 MRSA, 12 CPE, 5 VRE carriers. Carrier re-appearance (PAT-02): 1,336 alerts over 3 years on hospital wards (~8.5 a week, ~1 per ward); routine, so kept out of the badge and replay pauses. |
 | ANOM-09 | Multi-ward signal: 1 firing in 3 years on the organizers' data (ESBL K. pneumoniae R: CIP CRO CXM TZP on GER, MED-A, PHC-N in April 2025, 3 cases); the data has no planted spread. A planted two-ward spread (3 + 3 cases in 10 days, test only) is found. |
 
+**Slice 5 results** (checked by `backend/tests/test_slice5.py`)
+
+| # | Result |
+|---|---|
+| E1 | Drill-down on 20 Jun 2025: Varha 3 anomalies → Tyks 2 (only URO shown: the ESBL cluster and the ceftriaxone shift; 6 wards calm) and PHC-N 1 (CPE sentinel). The clinician's avoid list on URO that day shows ampicillin, trimethoprim and nitrofurantoin (12-month) plus **ceftriaxone, ciprofloxacin and cefuroxime as recent rises** (31–34 % in 4 weeks vs 4–12 % before): the 12-month figures alone would have said "no warning" for them. The order-select hook warns on ceftriaxone the same way. |
+
 Other slice-4 findings: the MED-A ESBL cluster (Apr 2025, not in the answer key) has mixed profiles (2 of 3 match), so
 it is probably not one strain. Therapy helper: on most wards no agent reaches 90 % coverage for UTIs, because
 E. faecalis (~10 %) is never tested for most agents and counts as not covered.
@@ -400,6 +409,9 @@ E. faecalis (~10 %) is never tested for most agents and counts as not covered.
 | 2026-10-17 | **UX-01 Varha hierarchy:** one main hierarchy by where the sample was taken: Varha → institution → ward → (existing) cell / alert / cases / patient. Lab & stewardship land on Varha, infection control on Tyks, clinicians stay on their ward. In the demo Varha = Tyks + PHC-N + PHC-S; PHC-N and PHC-S are separate institutions here (the STAT-04 fallback still groups them). Other Varha hospitals (Loimaa, Vakka-Suomi, Salo) are greyed placeholders labelled "not in demo data": shows the scale without inventing results; levels are data-driven so real hospitals would fill in. No extension data needed. Schematic layout, no real map. Home area is a community lens on the Varha page, not a level. Three roles stay (no separate Varha-management role). |
 | 2026-10-17 | **UX-02/03 anomalies only:** overview pages show anomalies, not everything. Anomaly = active alert (new or ongoing, any type) or feed problem (delayed / stale / data gap). Chronic red cells are *not* anomalies (they would keep every count non-zero). Higher levels show anomaly counts per child, never an overall resistance % (averages hide a 30 % ward inside a 9 % hospital). Children without anomalies collapse into one line naming them, so "calm" is never confused with "no data". Colour means action: only anomalies get colour, normal is quiet grey. |
 | 2026-10-17 | **UX-05 clinician view = what not to use:** prescribers already know what they want; they need to know when *not* to use it. The "avoid" list comes from per-organism resistance (cells above the threshold for the infection's main organisms), not WISCA coverage, because untested E. faecalis caps UTI coverage near 90 % for nearly every agent. Each line carries since when, direction and n. In the moment of prescribing, the CDS order-select hook (API-02) does the same in the patient record. |
+| 2026-10-17 | **UX-05 recent rises:** the 12-month avoid list lags a sudden change, so an active resistance-shift alert on the ward for the infection's specimen adds its agents as "recent rise" (amber; observed 4-week rate vs the year before, link to the alert) and takes them off the "no local warning" line; an agent already flagged gets a "rising fast" tag. The order-select hook warns on them too. Found in the E1 check: during the URO outbreak ceftriaxone read "no warning" on 12-month data. |
+| 2026-10-17 | **UX-05 avoid-list details:** main organisms = ≥ 10 % of the infection's first isolates (most specific level with ≥ 30); each organism × agent falls back ward → institution → all like the antibiogram. "Since" = start of the unbroken run of monthly 12-month rates ≥ 20 % ("or earlier" when it reaches the start of the data). Direction = last 12 months vs the 12 before, Fisher p < 0.05 and ≥ 5 points, else stable. Intrinsic resistance is never a flag; agents most organisms resist intrinsically (vancomycin for a UTI) are listed as "doesn't act on most of these organisms". |
+| 2026-10-17 | **VIEW-09 colour means action:** cells below 10 % lose their green fill (quiet, outlined); amber and red keep theirs. Overview tiles and stripes are coloured only by anomaly severity. |
 | 2026-10-17 | **UX-06 notifications demoted:** alerts are first-party (inbox, overview, detail); notifications are delivery (email / Teams / webhook) and live under settings. Clinicians lose the badge and the alert strip; their ward's alerts appear inside the exceptions list. Infection-control nav becomes Overview (home) · Alerts · Spread · Carriers · ⚙. |
 
 ## 10. To-do & open questions
@@ -475,5 +487,5 @@ Work is split into vertical slices, one commit series each. Update the status he
 | 2 | Detectors + alerts | NOTIF-01/02/04/06 · ANOM-01, 02, 04, 06, 08 · STAT-08 · V3 inbox, V4 detail, V1 alert strip, V7 feed status | done |
 | 3 | Replay, trends, discovery | LIVE-02/04 · ANOM-03, 07 · V6 trends, V5 heatmap · STAT-07 defaults, STAT-09 · DATA-05 incremental | done |
 | 4 | Patients + integration | PAT-01–03 · API-02–05 · NOTIF-03/05 · V2 therapy helper · V10 spread · V11 mock EHR · ANOM-05/09 · VIEW-08 roles (moved up from slice 5) | done |
-| 5 | Usability optimization | UX-02–06 (exceptions-first overview, Varha drill-down, clinician "avoid" view, notifications to settings, visual polish; UX-01 design decided) · role landing pages polish · VIEW-09 | next |
-| 6 | AI, extension data, delivery | AI-01–04 · EXT-* · README, demo presets | |
+| 5 | Usability optimization | UX-02–06 (exceptions-first overview, Varha drill-down, clinician "avoid" view, notifications to settings, visual polish; UX-01 design decided) · role landing pages · VIEW-09 | done (UX-04 partly: older views keep plain styling) |
+| 6 | AI, extension data, delivery | AI-01–04 · EXT-* · README, demo presets · polish of the older views (rest of UX-04) | next |

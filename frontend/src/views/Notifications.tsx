@@ -40,9 +40,12 @@ export function Notifications() {
     <>
       <section className="ward-head">
         <div>
-          <p className="eyebrow">Notifications</p>
+          <p className="eyebrow">Settings · notifications</p>
           <h1>Who gets told what</h1>
-          <p className="ward-sub">Alerts go out by role and ward, to the channels people already use · as of {fmtDate(asOf)}</p>
+          <p className="ward-sub">
+            Alerts live in AEI (overview, alert list); these settings only decide who is also told outside it, by role
+            and ward, on the channels people already use · as of {fmtDate(asOf)}
+          </p>
         </div>
       </section>
 

@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from app import config
 from app.alerts import engine, notify
+from app.alerts.anomalies import anomalies, recent_rises
 from app.alerts.detail import episode_detail
 from app.alerts.triage import STATUSES, TriageStore, get_triage_store
 from app.data import windows
@@ -23,6 +24,7 @@ from app.data.store import IngestError, batch_from_records, get_store
 from app.patients.registry import carriers, flag_dict, patient_record
 from app.stats import overview, trends
 from app.stats.antibiogram import SPLIT_DIMENSIONS, Split, build_antibiogram
+from app.stats.avoid import avoid, with_recent_rises
 from app.stats.spread import spread
 from app.stats.subgroups import discover
 from app.stats.therapy import therapy
@@ -95,6 +97,7 @@ def meta() -> dict:
                 "label": cfg["label"],
                 "severity": cfg["severity"],
                 "routine": bool(cfg.get("routine")),
+                "action": config.ALERT_ACTIONS.get(key),
             }
             for key, cfg in config.ALERT_TYPES.items()
         ],
@@ -118,6 +121,11 @@ def meta() -> dict:
             {"key": k, "label": v["label"], "specimen": v["specimen"]}
             for k, v in config.THERAPY_INFECTIONS.items()
         ],
+        "varha": {
+            "label": config.VARHA_LABEL,
+            "full": config.VARHA_FULL,
+            "hospital": config.VARHA_HOSPITAL,
+        },
         "thresholds": {
             "min_isolates": config.MIN_ISOLATES_FOR_PERCENT,
             "good_below": config.RESISTANCE_GOOD_BELOW,
@@ -608,3 +616,35 @@ def mock_ehr_inbox() -> dict:
 def mock_ehr_clear() -> dict:
     notify.MOCK_INBOX.clear()
     return {"cleared": True}
+
+
+# ---------- Exceptions first (slice 5) ----------
+
+
+@router.get("/anomalies")
+def anomaly_overview(store: Store, as_of: date | None = AsOf) -> dict:
+    """Anomalies per ward, institution and Varha for the exceptions-first drill-down (UX-02/03):
+    active non-routine alerts and feed problems; counts only, no overall resistance %."""
+    return anomalies(get_dataset(), resolve_as_of(as_of), store)
+
+
+@router.get("/avoid")
+def avoid_list(
+    store: Store,
+    location: str = Query(..., description="Ward code, 'hospital', 'primary_care' or 'all'"),
+    infection: Literal["uti", "bloodstream", "wound"] = "uti",
+    sex: Literal["F", "M"] | None = None,
+    age_band: str | None = None,
+    hospital_acquired: bool | None = None,
+    as_of: date | None = AsOf,
+) -> dict:
+    """What not to use for this infection here (UX-05): agents a main organism is ≥ 20 %
+    resistant to over the last 12 months, with since when and the direction, plus recent rises
+    (active resistance-shift alerts) the 12-month figures don't show yet."""
+    if age_band is not None and age_band not in {b for b, _, _ in config.AGE_BANDS}:
+        raise HTTPException(422, f"unknown age_band: {age_band}")
+    scope = _scope(location, sex=sex, age_band=age_band, hospital_acquired=hospital_acquired)
+    ds, day = get_dataset(), resolve_as_of(as_of)
+    result = avoid(ds, scope, infection, day)
+    rises = recent_rises(ds, day, store, scope.ward_codes(ds.wards), result["specimen"])
+    return with_recent_rises(result, rises)

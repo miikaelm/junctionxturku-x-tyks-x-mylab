@@ -6,7 +6,7 @@ export function Legend() {
   return (
     <div className="legend">
       <span className="legend-item">
-        <span className="swatch tier-good" /> &lt; {good_below} % resistant
+        <span className="swatch tier-good" /> &lt; {good_below} % resistant (no colour: nothing to act on)
       </span>
       <span className="legend-item">
         <span className="swatch tier-warn" /> {good_below}–{warn_below} %

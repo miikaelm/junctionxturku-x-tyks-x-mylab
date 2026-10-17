@@ -119,3 +119,12 @@ Our convention: first isolate is taken *within the analysed stratum and window* 
   Most organism × agent pairs relevant to empirical therapy are never tested, which caps WISCA coverage.
 - No multi-ward spread is planted: one profile turning up on several wards beyond its own baseline happens once in
   3 years (3 ESBL K. pneumoniae, Apr 2025).
+
+## Learned while building the exceptions-first views (slice 5)
+- Avoid lists on 2026-09-27 (≥ 20 % resistant in a main organism, last 12 months): **UTI** ampicillin everywhere
+  (E. coli 30–43 %), nitrofurantoin on most wards (K. pneumoniae 26–50 %), trimethoprim on the inpatient wards
+  (E. coli ~24 %), cefuroxime on GER (K. pneumoniae 24 %); **bloodstream and wound** only ampicillin (E. coli).
+  Most of these have held for the whole period ("since Oct 2024 or earlier"), so they are background, not news.
+- Blood cultures are thin: SURG, URO and GER fall back to all hospital wards, the health centres to all locations.
+- Short-term rises (resistance-shift alerts) are what changes week to week: during E1, URO E. coli ceftriaxone,
+  ciprofloxacin and cefuroxime went to 31–34 % in 4 weeks while the 12-month figures stayed below 20 %.
