@@ -197,3 +197,86 @@ HEATMAP_KEY_RATES = [
     {"specimen": "urine", "organism": "Klebsiella pneumoniae", "antibiotic": "CRO"},
     {"specimen": "wound", "organism": "Staphylococcus aureus", "antibiotic": "FOX"},
 ]
+
+# --- Patients, spread, therapy and integration (slice 4) ------------------------------------
+
+# Carrier registry (PAT-01): a patient with any isolate carrying one of these phenotypes is a
+# known carrier from that sample date on. No expiry by default (None): the data covers 3 years
+# and a flag is cleared only by screening, which this data does not record.
+CARRIER_PHENOTYPES = ["ESBL", "MRSA", "VRE", "CPE"]
+CARRIER_FLAG_DAYS: int | None = None
+
+# Carrier re-appearance (PAT-02): a known carrier sampled on a ward raises an alert for that
+# ward, unless the patient was already sampled there in the last CARRIER_REVISIT_DAYS days (the
+# ward knows). Only hospital wards, where contact precautions apply; health-centre visits use
+# standard precautions.
+CARRIER_ALERT_INSTITUTIONS = ("hospital",)
+CARRIER_REVISIT_DAYS = 30
+
+# Resistance profiles (ANOM-05, ANOM-09): an isolate's profile is the set of agents it is
+# resistant to among those tested (intrinsic resistance left out). Urine-only agents are left
+# out when profiles are compared across wards and specimens, since only urine isolates get them.
+PROFILE_URINE_ONLY = ("MEC", "TMP", "NIT")
+PROFILE_MIN_SHARED = 3  # agents both were tested for (wound S. aureus gets only FOX, VAN, CLI)
+PROFILE_BASELINE_DAYS = 365
+# A cluster looks like one strain when at least this share of its cases match the dominant
+# profile and that is unlikely given how common the profile is elsewhere (binomial test).
+PROFILE_SAME_STRAIN_SHARE = 0.7
+PROFILE_SAME_STRAIN_ALPHA = 0.01
+PROFILE_MIN_BACKGROUND = 10  # background isolates needed for the comparison
+
+# Multi-ward signal (ANOM-09): new cases of one phenotype × organism × profile on ≥ 2 wards in
+# MULTIWARD_WINDOW_DAYS, significantly above the profile's hospital-wide baseline (Poisson, FDR
+# across profiles that day), with the excess not confined to one ward: the cases outside the
+# busiest ward must also exceed their own expected count.
+MULTIWARD_WINDOW_DAYS = 28
+MULTIWARD_MIN_CASES = 3
+MULTIWARD_MIN_OUTSIDE_CASES = 2
+MULTIWARD_OUTSIDE_ALPHA = 0.05
+
+ALERT_TYPES["carrier"] = {
+    "label": "Known carrier sampled",
+    "severity": "medium",  # must not outrank clusters
+    "episode_gap": 7,
+    "active_days": 7,
+    # Routine: ~1 per hospital ward per week. Shown to the ward and in its own inbox section, but
+    # not counted in the "new alerts" badge, the replay jump list or pause-on-new-alert.
+    "routine": True,
+}
+ALERT_TYPES["multi_ward"] = {
+    "label": "Seen on several wards",
+    "severity": "high",
+    "episode_gap": 28,
+    "active_days": 14,
+}
+
+# Spread view (V10) and "where did they go next" (PAT-03): samples of a cluster's patients on
+# other wards after their case, up to this many days later.
+FOLLOWUP_DAYS = 90
+
+# Therapy helper (V2, VIEW-04): weighted-incidence syndromic antibiogram (WISCA). Coverage of an
+# agent = Σ organism share × susceptibility, first isolates of the infection's specimen in the
+# last 12 months, with a Bayesian interval (Dirichlet × Beta draws).
+THERAPY_INFECTIONS = {
+    "uti": {"label": "Urinary tract infection", "specimen": "urine"},
+    "bloodstream": {"label": "Bloodstream infection", "specimen": "blood"},
+    "wound": {"label": "Wound infection", "specimen": "wound"},
+}
+THERAPY_MIN_ISOLATES = 30  # first isolates in the population; else fall back to a broader level
+THERAPY_GOOD_COVERAGE = 90.0  # mirrors the 10 % / 20 % resistance tiers
+THERAPY_WARN_COVERAGE = 80.0
+THERAPY_MAX_UNKNOWN_SHARE = 0.5  # agents untested on more of the population are listed apart
+THERAPY_DRAWS = 4000
+THERAPY_EXCLUDE = ("FOX",)  # the cefoxitin screen detects MRSA; it is not a treatment
+# Reserve agents: shown, but marked, since guidelines keep them for resistant infections.
+THERAPY_RESERVE = ("MEM",)
+# EUCAST expert rule: S. aureus susceptibility to β-lactams other than penicillins is inferred
+# from the cefoxitin screen (MSSA susceptible, MRSA resistant).
+THERAPY_INFERRED = {("Staphylococcus aureus", code): "FOX" for code in ("TZP", "CXM", "CRO", "MEM")}
+
+# Integration (API-02–05, NOTIF-03/05). Links on CDS cards point at the web app.
+UI_BASE_URL = os.environ.get("AEI_UI_URL", "http://localhost:5173")
+# Where this API is reachable, for the default webhook to the mock patient record (API-04).
+API_BASE_URL = os.environ.get("AEI_API_URL", "http://localhost:8000")
+WEBHOOK_TIMEOUT_SECONDS = 5
+DIGEST_PERIODS = {"week": 7, "month": 30}

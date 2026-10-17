@@ -84,7 +84,7 @@ export function ReplayBar({ settings, onSettings }: { settings: ReplaySettings; 
                 <optgroup key={t.key} label={`${t.label} (${byType.get(t.key)!.length})`}>
                   {byType.get(t.key)!.map((e) => (
                     <option key={e.id} value={e.id}>
-                      {e.first_seen} · {e.ward} · {e.title}
+                      {e.first_seen} · {e.wards.join(", ")} · {e.title}
                     </option>
                   ))}
                 </optgroup>
@@ -107,7 +107,7 @@ export function ReplayBar({ settings, onSettings }: { settings: ReplaySettings; 
               <li key={a.id}>
                 <SeverityPill severity={a.severity} />{" "}
                 <a href={href({ view: "alert", id: a.id })}>
-                  <span className="mono">{a.ward}</span> {a.type_label}: {a.title}
+                  <span className="mono">{a.wards.join(", ")}</span> {a.type_label}: {a.title}
                 </a>{" "}
                 <span className="muted small">
                   raised {fmtDate(a.first_seen)}

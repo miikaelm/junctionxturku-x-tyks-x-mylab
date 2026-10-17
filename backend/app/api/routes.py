@@ -3,14 +3,15 @@
 Every data endpoint takes `as_of` (LIVE-01): results are computed as if that day were today.
 """
 
-from datetime import date
+from datetime import date, datetime, timedelta
 from typing import Annotated, Literal
 
+import pandas as pd
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app import config
-from app.alerts import engine
+from app.alerts import engine, notify
 from app.alerts.detail import episode_detail
 from app.alerts.triage import STATUSES, TriageStore, get_triage_store
 from app.data import windows
@@ -19,14 +20,18 @@ from app.data.freshness import feed_status, ward_freshness
 from app.data.intrinsic import INTRINSIC_RESISTANCE
 from app.data.scope import ALL_LABEL, INSTITUTION_LABELS, Scope
 from app.data.store import IngestError, batch_from_records, get_store
+from app.patients.registry import carriers, flag_dict, patient_record
 from app.stats import overview, trends
 from app.stats.antibiogram import SPLIT_DIMENSIONS, Split, build_antibiogram
+from app.stats.spread import spread
 from app.stats.subgroups import discover
+from app.stats.therapy import therapy
 
 router = APIRouter(prefix="/api")
 
 AsOf = Query(None, description="Compute as if this day were today (default: scenario today)")
 Store = Annotated[TriageStore, Depends(get_triage_store)]
+Subs = Annotated[notify.SubscriptionStore, Depends(notify.get_subscription_store)]
 Specimen = Literal["urine", "blood", "wound"]
 SplitBy = Literal["sex", "age_band", "hospital_acquired", "ward_type", "home_area", "none"]
 
@@ -85,7 +90,12 @@ def meta() -> dict:
         "organisms": sorted(ds.isolates.organism.unique()),
         "age_bands": [label for label, _, _ in config.AGE_BANDS],
         "alert_types": [
-            {"key": key, "label": cfg["label"], "severity": cfg["severity"]}
+            {
+                "key": key,
+                "label": cfg["label"],
+                "severity": cfg["severity"],
+                "routine": bool(cfg.get("routine")),
+            }
             for key, cfg in config.ALERT_TYPES.items()
         ],
         "severities": config.SEVERITY_ORDER,
@@ -104,12 +114,18 @@ def meta() -> dict:
             {"code": a.antibiotic_code, "name": a.antibiotic, "reported_for": a.reported_for}
             for a in ds.antibiotics.itertuples(index=False)
         ],
+        "infections": [
+            {"key": k, "label": v["label"], "specimen": v["specimen"]}
+            for k, v in config.THERAPY_INFECTIONS.items()
+        ],
         "thresholds": {
             "min_isolates": config.MIN_ISOLATES_FOR_PERCENT,
             "good_below": config.RESISTANCE_GOOD_BELOW,
             "warn_below": config.RESISTANCE_WARN_BELOW,
             "ci_level": config.CI_LEVEL,
             "empirical_pct": config.EMPIRICAL_THRESHOLD_PCT,
+            "coverage_good": config.THERAPY_GOOD_COVERAGE,
+            "coverage_warn": config.THERAPY_WARN_COVERAGE,
         },
     }
 
@@ -238,6 +254,7 @@ def ward_overview(
             "type_label": config.ALERT_TYPES[e.type]["label"],
             "severity": config.ALERT_TYPES[e.type]["severity"],
             "ward": e.ward,
+            "wards": e.wards(as_of),
             "first_seen": e.first.isoformat(),
             "title": e.firings[0].title,
         }
@@ -395,3 +412,199 @@ def reset_triage(store: Store) -> dict:
     """Clear all triage state (demo reset)."""
     store.clear()
     return {"status": "cleared"}
+
+
+# ---------- Patients, spread, therapy (slice 4) ----------
+
+
+@router.get("/therapy")
+def therapy_helper(
+    location: str = Query(..., description="Ward code, 'hospital', 'primary_care' or 'all'"),
+    infection: Literal["uti", "bloodstream", "wound"] = "uti",
+    sex: Literal["F", "M"] | None = None,
+    age_band: str | None = None,
+    hospital_acquired: bool | None = None,
+    as_of: date | None = AsOf,
+) -> dict:
+    """Which antibiotics are likely to cover this infection here (V2, WISCA): coverage =
+    Σ organism share × susceptibility, with a 95 % interval and fallbacks."""
+    if age_band is not None and age_band not in {b for b, _, _ in config.AGE_BANDS}:
+        raise HTTPException(422, f"unknown age_band: {age_band}")
+    scope = _scope(location, sex=sex, age_band=age_band, hospital_acquired=hospital_acquired)
+    return therapy(get_dataset(), scope, infection, resolve_as_of(as_of))
+
+
+@router.get("/carriers")
+def carrier_registry(
+    location: str | None = Query(None, description="Only carriers positive on these wards"),
+    phenotype: str | None = None,
+    days: int | None = Query(None, ge=1, description="Only flags first set in the last N days"),
+    limit: int = Query(200, ge=1, le=5000),
+    as_of: date | None = AsOf,
+) -> dict:
+    """The carrier registry (PAT-01) on the as-of date, newest flags first. Patient-level data:
+    for infection control and lab (NF-03)."""
+    as_of = resolve_as_of(as_of)
+    reg = carriers(get_dataset(), as_of)
+    if phenotype:
+        reg = reg[reg.phenotype.eq(phenotype)]
+    if (wards := _ward_filter(location)) is not None:
+        reg = reg[[bool(wards & set(w)) for w in reg.wards]]
+    if days:
+        reg = reg[reg.first_positive > pd.Timestamp(as_of) - pd.Timedelta(days=days)]
+    return {
+        "as_of": as_of.isoformat(),
+        "total": len(reg),
+        "by_phenotype": reg.phenotype.value_counts().to_dict(),
+        "carriers": [flag_dict(r) for r in reg.head(limit).itertuples(index=False)],
+    }
+
+
+@router.get("/patients/{patient_id}")
+def patient(patient_id: str, store: Store, as_of: date | None = AsOf) -> dict:
+    """One patient: carrier flags, samples and active alerts they are part of (PAT-01, API-03)."""
+    as_of = resolve_as_of(as_of)
+    ds = get_dataset()
+    record = patient_record(ds, patient_id, as_of)
+    if record is None:
+        raise HTTPException(404, f"no samples for patient {patient_id} up to {as_of}")
+    return {
+        "as_of": as_of.isoformat(),
+        **record,
+        "alerts": engine.alerts_for_patient(ds, as_of, store, patient_id),
+    }
+
+
+@router.get("/spread")
+def spread_view(
+    phenotype: str = "ESBL",
+    organism: str | None = None,
+    profile: str | None = Query(None, description="Core resistance profile key, e.g. AMP,CRO,CXM"),
+    days: int = Query(182, ge=14, le=1100),
+    as_of: date | None = AsOf,
+) -> dict:
+    """Where a phenotype appears across wards over time, by resistance profile, with the case
+    patients' paths between wards (V10, PAT-03) and the related cluster / multi-ward alerts."""
+    if phenotype not in config.PHENOTYPES:
+        raise HTTPException(422, f"unknown phenotype: {phenotype}")
+    as_of = resolve_as_of(as_of)
+    ds = get_dataset()
+    return spread(ds, as_of, phenotype, days, engine.timeline(ds, as_of), organism, profile)
+
+
+# ---------- Notifications and webhooks (slice 4) ----------
+
+
+class Subscription(BaseModel):
+    id: str
+    name: str
+    role: Literal["clinician", "infection_control", "lab", "system"]
+    channel: Literal["webhook", "email", "teams"]
+    target: str
+    wards: list[str] | None = None
+    min_severity: Literal["critical", "high", "medium", "low", "info"] = "medium"
+    types: list[str] | None = None
+    include_routine: bool = False
+    events: list[Literal["alert", "carrier_flag", "digest"]] = ["alert"]
+
+
+@router.get("/subscriptions")
+def list_subscriptions(subs: Subs) -> dict:
+    """Who gets which alerts, by role and ward, and how (NOTIF-03)."""
+    return {"subscriptions": subs.all()}
+
+
+@router.put("/subscriptions/{sub_id}")
+def put_subscription(sub_id: str, sub: Subscription, subs: Subs) -> dict:
+    if sub.id != sub_id:
+        raise HTTPException(422, "id in the body must match the path")
+    known = set(get_dataset().wards.ward_code)
+    if sub.wards and not set(sub.wards) <= known:
+        raise HTTPException(422, f"unknown wards: {sorted(set(sub.wards) - known)}")
+    if sub.types and not set(sub.types) <= set(config.ALERT_TYPES):
+        raise HTTPException(422, "unknown alert type")
+    return subs.put(sub.model_dump())
+
+
+@router.delete("/subscriptions/{sub_id}")
+def delete_subscription(sub_id: str, subs: Subs) -> dict:
+    if not subs.delete(sub_id):
+        raise HTTPException(404, f"no subscription {sub_id}")
+    return {"deleted": sub_id}
+
+
+@router.post("/subscriptions/reset")
+def reset_subscriptions(subs: Subs) -> dict:
+    subs.reset()
+    return {"subscriptions": subs.all()}
+
+
+@router.post("/subscriptions/{sub_id}/test")
+def test_subscription(sub_id: str, subs: Subs) -> dict:
+    """Send a test message through the subscription's channel (webhooks are really POSTed)."""
+    sub = subs.get(sub_id)
+    if sub is None:
+        raise HTTPException(404, f"no subscription {sub_id}")
+    today = get_store().today()
+    msg = notify.message(
+        sub,
+        today,
+        "test",
+        "Test message from AEI",
+        "If you can read this, delivery works.",
+        {"event": "test", "sent": today.isoformat()},
+    )
+    notify.deliver([msg])
+    return {"queued": msg}
+
+
+@router.get("/notifications")
+def notifications(
+    store: Store,
+    subs: Subs,
+    days: int = Query(7, ge=1, le=92),
+    subscription: str | None = None,
+    as_of: date | None = AsOf,
+) -> dict:
+    """Messages each subscription got in the days up to as_of (NOTIF-05): the same alerts the
+    inbox shows, so replay shows what was sent when. Email and Teams are simulated."""
+    as_of = resolve_as_of(as_of)
+    chosen = [s for s in subs.all() if subscription in (None, s["id"])]
+    start = max(get_dataset().start.date(), as_of - timedelta(days=days - 1))
+    messages = notify.planned(get_dataset(), store, chosen, start, as_of)
+    return {"as_of": as_of.isoformat(), "start": start.isoformat(), "messages": messages}
+
+
+@router.get("/notifications/deliveries")
+def deliveries() -> dict:
+    """Live delivery log: messages sent when new data arrived (DATA-05), webhook results."""
+    return {"deliveries": list(notify.DELIVERIES)}
+
+
+@router.get("/digest")
+def digest(
+    store: Store,
+    period: Literal["week", "month"] = "week",
+    as_of: date | None = AsOf,
+) -> dict:
+    """Periodic summary (NOTIF-05): new alerts, carriers, data gaps, long-term trend findings."""
+    return notify.digest(get_dataset(), store, resolve_as_of(as_of), period)
+
+
+@router.post("/mock-ehr/inbox")
+def mock_ehr_receive(payload: Annotated[dict, Body()]) -> dict:
+    """Mock receiver standing in for the hospital's patient record system (API-04 demo)."""
+    entry = {"received": datetime.now().isoformat(timespec="seconds"), "payload": payload}
+    notify.MOCK_INBOX.appendleft(entry)
+    return {"ok": True}
+
+
+@router.get("/mock-ehr/inbox")
+def mock_ehr_inbox() -> dict:
+    return {"messages": list(notify.MOCK_INBOX)}
+
+
+@router.delete("/mock-ehr/inbox")
+def mock_ehr_clear() -> dict:
+    notify.MOCK_INBOX.clear()
+    return {"cleared": True}

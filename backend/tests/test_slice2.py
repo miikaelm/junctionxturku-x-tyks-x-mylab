@@ -100,8 +100,9 @@ def test_alerts_at_as_of(store):
     assert active[0]["severity"] == "critical"
     # The URO outbreak is active in late June 2025 and resolved by September.
     june = engine.alerts_at(ds, date(2025, 6, 20), store, wards={"URO"})
-    assert {a["type"] for a in june} == {"cluster", "rate_shift"}
+    assert {a["type"] for a in june if not a["routine"]} == {"cluster", "rate_shift"}
     sept = engine.alerts_at(ds, date(2025, 9, 1), store, wards={"URO"}, include_resolved=True)
+    sept = [a for a in sept if not a["routine"]]
     assert sept and all(a["state"] == "resolved" for a in sept)
 
 

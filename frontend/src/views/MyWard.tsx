@@ -8,6 +8,7 @@ import { FilterBar, type Filters } from "../components/FilterBar";
 import { FreshnessBadge } from "../components/FreshnessBadge";
 import { Legend } from "../components/Legend";
 import { SubgroupPanel } from "../components/SubgroupPanel";
+import { TherapyHelper } from "../components/TherapyHelper";
 import { fmtDate } from "../lib/format";
 import { useFetch, useLocalStorage } from "../lib/hooks";
 import { useApp } from "../state/AppContext";
@@ -73,6 +74,8 @@ export function MyWard() {
         filters={filters}
         onFilters={setFilters}
       />
+
+      <TherapyHelper location={location} specimen={specimen} filters={filters} />
 
       {ab.error && <p className="error">Could not load the antibiogram: {ab.error}</p>}
       {data && (

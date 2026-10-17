@@ -4,13 +4,19 @@ import { Header } from "./components/Header";
 import { ReplayBar, type ReplaySettings } from "./components/ReplayBar";
 import { addDays } from "./lib/format";
 import { useFetch, useIdle, useLocalStorage } from "./lib/hooks";
+import type { RoleSetting } from "./lib/roles";
 import { useHashRoute } from "./lib/route";
 import { AppContext } from "./state/AppContext";
 import { AlertDetailView } from "./views/AlertDetail";
 import { AlertInbox } from "./views/AlertInbox";
 import { FeedStatus } from "./views/FeedStatus";
+import { MockEhr } from "./views/MockEhr";
 import { MyWard } from "./views/MyWard";
+import { Notifications } from "./views/Notifications";
 import { Overview } from "./views/Overview";
+import { PatientView, Patients } from "./views/Patients";
+import { RolePicker } from "./views/RolePicker";
+import { Spread } from "./views/Spread";
 import { Trends } from "./views/Trends";
 
 const STATUS_POLL_MS = 10_000;
@@ -28,6 +34,7 @@ export default function App() {
     pauseOnAlert: true,
   });
   const [news, setNews] = useState<AlertSummary[]>([]);
+  const [role, setRole] = useLocalStorage<RoleSetting | null>("aei.role", null);
   const route = useHashRoute();
   const asOf = asOfState ?? meta?.default_as_of ?? null;
   const alerts = useFetch(
@@ -48,8 +55,10 @@ export default function App() {
       setNews([]); // a jump, not a step: everything would be "new"
       return;
     }
+    // Routine alerts (known carriers sampled, ~1 per ward per week) would stop replay every step.
     const fresh = cur.alerts.filter(
-      (a) => a.first_seen > before.as_of && a.first_seen <= cur.as_of && a.triage.status !== "dismissed",
+      (a) =>
+        !a.routine && a.first_seen > before.as_of && a.first_seen <= cur.as_of && a.triage.status !== "dismissed",
     );
     if (fresh.length === 0) return;
     setNews((n) => [...fresh, ...n.filter((x) => !fresh.some((f) => f.id === x.id))]);
@@ -100,6 +109,16 @@ export default function App() {
   }
   if (!meta || !asOf) return <div className="boot">Loading…</div>;
 
+  // A clinician's badge counts new alerts on their own ward, routine ones included (they are
+  // about that ward's patients); the other roles count new non-routine alerts (NOTIF-03).
+  const badge =
+    role?.role === "clinician"
+      ? (alerts.data?.alerts ?? []).filter(
+          (a) => a.state === "active" && a.triage.status === "new" && a.wards.includes(role.ward ?? ""),
+        ).length
+      : (alerts.data?.counts.new ?? 0);
+  const picking = !role || route.view === "start";
+
   return (
     <AppContext.Provider
       value={{
@@ -114,18 +133,32 @@ export default function App() {
         news,
         clearNews: () => setNews([]),
         checkForData: () => setPollNow((v) => v + 1),
+        role: role ?? { role: "infection_control" },
+        setRole,
       }}
     >
-      <Header route={route} />
-      <ReplayBar settings={replay} onSettings={setReplay} />
-      <main className="page">
-        {route.view === "ward" && <MyWard />}
-        {route.view === "alerts" && <AlertInbox />}
-        {route.view === "alert" && <AlertDetailView id={route.id} />}
-        {route.view === "overview" && <Overview />}
-        {route.view === "trends" && <Trends />}
-        {route.view === "feed" && <FeedStatus />}
-      </main>
+      {route.view === "ehr" ? (
+        <MockEhr patientId={route.id} />
+      ) : picking ? (
+        <RolePicker meta={meta} current={role} onPick={setRole} />
+      ) : (
+        <>
+          <Header route={route} badge={badge} />
+          <ReplayBar settings={replay} onSettings={setReplay} />
+          <main className="page">
+            {route.view === "ward" && <MyWard />}
+            {route.view === "alerts" && <AlertInbox />}
+            {route.view === "alert" && <AlertDetailView id={route.id} />}
+            {route.view === "overview" && <Overview />}
+            {route.view === "trends" && <Trends />}
+            {route.view === "feed" && <FeedStatus />}
+            {route.view === "spread" && <Spread />}
+            {route.view === "patients" && <Patients />}
+            {route.view === "patient" && <PatientView id={route.id} />}
+            {route.view === "notifications" && <Notifications />}
+          </main>
+        </>
+      )}
     </AppContext.Provider>
   );
 }

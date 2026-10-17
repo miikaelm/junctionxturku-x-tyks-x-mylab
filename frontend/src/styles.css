@@ -1429,3 +1429,411 @@ a {
     padding-right: 16px;
   }
 }
+
+/* ---------- Roles, therapy helper, spread, patients, notifications, mock EHR (slice 4: plain styles) ---------- */
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.block {
+  display: block;
+}
+.strong {
+  font-weight: 650;
+}
+.error-text {
+  color: var(--bad);
+}
+.tag-bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.role-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 13px;
+}
+.role-chip a {
+  text-decoration: none;
+}
+.role-page {
+  max-width: 1100px;
+}
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+.role-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.role-card.is-current {
+  outline: 2px solid var(--accent);
+}
+.role-question {
+  font-size: 15px;
+}
+.role-card .btn {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+.therapy {
+  margin: 12px 0;
+}
+.therapy-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.therapy-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+}
+.therapy-chip {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  text-align: left;
+}
+.therapy-chip.on {
+  outline: 2px solid var(--accent);
+}
+.therapy-name {
+  font-weight: 600;
+}
+.therapy-pct {
+  font-weight: 700;
+  text-align: right;
+}
+.therapy-ci {
+  grid-column: 2;
+  font-size: 11px;
+  opacity: 0.75;
+  text-align: right;
+}
+.therapy-detail {
+  margin: 8px 0 12px;
+}
+.tier-text-good {
+  color: var(--good);
+}
+.tier-text-warn {
+  color: var(--warn);
+}
+.tier-text-bad {
+  color: var(--bad);
+}
+.alert-strip-routine {
+  margin-top: 6px;
+}
+
+.verdict {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  margin: 6px 0 10px;
+}
+.verdict-bad {
+  background: var(--bad-bg);
+}
+.verdict-warn {
+  background: var(--warn-bg);
+}
+.verdict-none {
+  background: var(--none-bg);
+}
+.profile-main {
+  font-weight: 600;
+}
+.routine summary {
+  cursor: pointer;
+}
+
+/* Spread chart: one colour per resistance profile (p0–p7), grey for the rest. */
+.spread-chart {
+  width: 100%;
+  min-width: 640px;
+  height: auto;
+}
+.spread-dot {
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+.spread-dot.is-ha {
+  stroke: var(--text);
+}
+.spread-dot.is-faded {
+  opacity: 0.15;
+}
+.spread-path polyline {
+  fill: none;
+  stroke: var(--text-3);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+.spread-sample {
+  fill: var(--surface);
+  stroke: var(--text-3);
+}
+.spread-alert {
+  fill: var(--warn);
+}
+.spread-alert.is-multi {
+  fill: var(--bad);
+}
+.p0 { fill: #1d5fd1; background: #1d5fd1; }
+.p1 { fill: #d1495b; background: #d1495b; }
+.p2 { fill: #2a9d8f; background: #2a9d8f; }
+.p3 { fill: #e9a03b; background: #e9a03b; }
+.p4 { fill: #7b4fc9; background: #7b4fc9; }
+.p5 { fill: #3d8b37; background: #3d8b37; }
+.p6 { fill: #c2569b; background: #c2569b; }
+.p7 { fill: #5a6b7d; background: #5a6b7d; }
+.px { fill: #b5bcc6; background: #b5bcc6; }
+.swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.patient-search {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.patient-search input {
+  padding: 5px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  width: 120px;
+}
+.flag-list {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+.flag {
+  padding: 8px 12px;
+  border-left: 4px solid var(--warn);
+  background: var(--warn-bg);
+  border-radius: var(--radius-sm);
+}
+.flag.is-critical {
+  border-color: var(--bad);
+  background: var(--bad-bg);
+}
+
+.msg-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+.msg {
+  border-top: 1px solid var(--line);
+  padding: 6px 0;
+}
+.msg summary {
+  cursor: pointer;
+}
+.msg-channel {
+  display: inline-block;
+  min-width: 62px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.digest {
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--surface-2);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  max-height: 320px;
+  overflow: auto;
+}
+.sub-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  padding: 8px 0;
+}
+.sub-form input {
+  padding: 5px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.sub-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+/* Mock EHR (V11): deliberately a different-looking "hospital system". */
+.ehr {
+  min-height: 100vh;
+  background: #e9edf1;
+  color: #1c2833;
+  font-family: Tahoma, Verdana, "Segoe UI", sans-serif;
+  font-size: 13px;
+}
+.ehr a {
+  color: #0b5394;
+}
+.ehr-top {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 16px;
+  background: #234a6b;
+  color: #fff;
+}
+.ehr-top a {
+  color: #d6e6f5;
+  margin-left: auto;
+}
+.ehr-demo {
+  font-size: 12px;
+  opacity: 0.8;
+}
+.ehr-body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 12px;
+  padding: 12px;
+}
+.ehr-side,
+.ehr-panel,
+.ehr-patient {
+  background: #fff;
+  border: 1px solid #c4ccd4;
+  padding: 10px 12px;
+}
+.ehr-side ul {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 12px;
+}
+.ehr-side input,
+.ehr-form select {
+  display: block;
+  width: 100%;
+  margin: 2px 0 6px;
+  padding: 3px 4px;
+  border: 1px solid #9aa7b4;
+  background: #fff;
+  color: #1c2833;
+}
+.ehr-main {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+.ehr-patient h1 {
+  font-size: 18px;
+}
+.ehr-panel h2 {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.ehr-panel pre {
+  font-size: 11px;
+  background: #f4f6f8;
+  padding: 8px;
+  overflow: auto;
+  max-height: 260px;
+}
+.ehr-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+  gap: 12px;
+}
+.ehr-hint {
+  color: #5d6d7e;
+  font-size: 12px;
+}
+.ehr-inbox li {
+  padding: 3px 0;
+  border-top: 1px solid #e3e7eb;
+}
+.ehr-inbox li.is-this {
+  background: #fff3cd;
+}
+.cds-card {
+  border: 1px solid #c4ccd4;
+  border-left: 6px solid #0b5394;
+  padding: 8px 10px;
+  margin: 8px 0;
+  background: #fbfcfd;
+}
+.cds-warning {
+  border-left-color: #d68910;
+}
+.cds-critical {
+  border-left-color: #c0392b;
+}
+.cds-summary {
+  font-weight: 700;
+}
+.cds-card p {
+  margin: 4px 0;
+}
+.cds-source {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: #5d6d7e;
+}
+.cds-table {
+  border-collapse: collapse;
+  margin: 6px 0;
+}
+.cds-table th,
+.cds-table td {
+  border: 1px solid #d5dbe1;
+  padding: 2px 6px;
+  text-align: left;
+}
+@media (max-width: 720px) {
+  .ehr-body {
+    grid-template-columns: 1fr;
+  }
+  .ehr-form {
+    grid-template-columns: 1fr;
+  }
+  .role-chip {
+    display: none;
+  }
+}
+.nav-item {
+  white-space: nowrap;
+}
+.nav {
+  flex-wrap: wrap;
+}

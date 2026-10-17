@@ -12,8 +12,10 @@ export function AlertStrip({ location }: { location: string }) {
     [asOf, location, alertsVersion, meta.data_version],
   );
   if (!data) return null;
-  const alerts = data.alerts.filter((a) => a.triage.status !== "dismissed");
-  if (alerts.length === 0) {
+  const open = data.alerts.filter((a) => a.triage.status !== "dismissed");
+  const alerts = open.filter((a) => !a.routine);
+  const carriers = open.filter((a) => a.routine);
+  if (open.length === 0) {
     return <p className="alert-strip-empty muted small">No active alerts here.</p>;
   }
   const isWard = location !== "all" && !["hospital", "primary_care"].includes(location);
@@ -21,11 +23,19 @@ export function AlertStrip({ location }: { location: string }) {
     <section className="alert-strip">
       <p className="alert-strip-head">
         <strong>
-          {alerts.length} active alert{alerts.length > 1 ? "s" : ""}
+          {alerts.length} active alert{alerts.length === 1 ? "" : "s"}
         </strong>{" "}
         <a href={href({ view: "alerts" })}>All alerts →</a>
       </p>
-      <AlertList alerts={alerts} showWard={!isWard} />
+      {alerts.length > 0 && <AlertList alerts={alerts} showWard={!isWard} />}
+      {carriers.length > 0 && (
+        <details className="alert-strip-routine">
+          <summary className="small">
+            {carriers.length} known carrier{carriers.length > 1 ? "s" : ""} sampled here recently (contact precautions)
+          </summary>
+          <AlertList alerts={carriers} showWard={!isWard} />
+        </details>
+      )}
     </section>
   );
 }

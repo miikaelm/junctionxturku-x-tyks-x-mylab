@@ -25,7 +25,7 @@ export interface Meta {
   specimens: Specimen[];
   organisms: string[];
   age_bands: string[];
-  alert_types: { key: AlertType; label: string; severity: Severity }[];
+  alert_types: { key: AlertType; label: string; severity: Severity; routine: boolean }[];
   severities: Severity[];
   triage_statuses: TriageStatus[];
   home_areas: string[];
@@ -35,14 +35,19 @@ export interface Meta {
   tested_pairs: [string, string][];
   intrinsic: Record<string, string[]>;
   antibiotics: { code: string; name: string; reported_for: string }[];
+  infections: { key: Infection; label: string; specimen: Specimen }[];
   thresholds: {
     min_isolates: number;
     good_below: number;
     warn_below: number;
     ci_level: number;
     empirical_pct: number;
+    coverage_good: number;
+    coverage_warn: number;
   };
 }
+
+export type Infection = "uti" | "bloodstream" | "wound";
 
 export type SplitBy = "sex" | "age_band" | "hospital_acquired" | "ward_type" | "home_area";
 
@@ -139,7 +144,14 @@ export interface Feed {
 
 // ---------- Alerts (slice 2) ----------
 
-export type AlertType = "sentinel" | "cluster" | "rate_shift" | "novelty" | "data_gap";
+export type AlertType =
+  | "sentinel"
+  | "cluster"
+  | "rate_shift"
+  | "novelty"
+  | "data_gap"
+  | "carrier"
+  | "multi_ward";
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 export type TriageStatus = "new" | "investigating" | "confirmed" | "dismissed";
 
@@ -162,6 +174,10 @@ export interface AlertSummary {
   severity: Severity;
   ward: string;
   ward_en: string;
+  /** The wards the alert concerns: one, or several for a multi-ward signal (ANOM-09). */
+  wards: string[];
+  /** Routine types (carrier re-appearances) are kept out of the badge and replay pauses. */
+  routine: boolean;
   subject: string;
   title: string;
   first_seen: string;
@@ -179,6 +195,8 @@ export interface AlertSummary {
 export interface AlertCounts {
   active: number;
   new: number;
+  routine: number;
+  routine_new: number;
   by_severity: Partial<Record<Severity, number>>;
 }
 
@@ -203,6 +221,49 @@ export interface CaseRow {
   resistant: string[];
   tested: number;
   highlight: boolean | null;
+  /** Resistance profile key (cluster / multi-ward alerts, ANOM-05). */
+  profile?: string;
+}
+
+export interface Similarity {
+  organism: string;
+  other_organisms: number;
+  cases: number;
+  matching: number;
+  share: number;
+  dominant: { key: string; label: string; tested: string[] };
+  groups: { key: string; label: string; count: number }[];
+  mean_agreement: number | null;
+  background: { start: string; end: string; isolates: number; matching: number; share: number | null };
+  p_value: number | null;
+  verdict: "single_strain" | "common_profile" | "mixed";
+  text: string;
+  method: string;
+}
+
+export interface Followup {
+  days: number;
+  case_patients: number;
+  patients: {
+    patient_id: string;
+    case_date: string;
+    case_ward: string;
+    seen: { date: string; ward: string; specimen: string }[];
+  }[];
+  wards: { ward: string; patients: number; first: string }[];
+}
+
+export interface CarrierFlag {
+  patient_id: string;
+  phenotype: string;
+  first_positive: string;
+  first_ward: string;
+  first_organism: string;
+  last_positive: string;
+  last_ward: string;
+  positives: number;
+  organisms: string[];
+  wards: string[];
 }
 
 export interface TimelinePoint extends Partial<Estimate> {
@@ -231,6 +292,9 @@ export interface AlertDetail extends AlertSummary {
   trigger: { day: string; title: string; evidence: Evidence };
   history: { day: string; title: string; p_value?: number; q_value?: number }[];
   cases: CaseRow[];
+  similarity: Similarity | null;
+  followup: Followup | null;
+  patient: { patient_id: string; flags: CarrierFlag[] } | null;
   timeline: AlertTimeline;
   triage_history: TriageEntry[];
 }
@@ -282,6 +346,7 @@ export interface ReplayEvent {
   type_label: string;
   severity: Severity;
   ward: string;
+  wards: string[];
   subject: string;
   title: string;
   onset: string;
@@ -391,6 +456,7 @@ export interface OverviewMarker {
   type_label: string;
   severity: Severity;
   ward: string;
+  wards: string[];
   first_seen: string;
   title: string;
 }
@@ -420,6 +486,196 @@ export interface OverviewQuery {
   as_of: string;
 }
 
+// ---------- Patients, spread, therapy, integration (slice 4) ----------
+
+export interface TherapyOrganism {
+  organism: string;
+  share: number;
+  n_isolates: number;
+  status: "tested" | "inferred" | "intrinsic" | "not_tested";
+  susceptible_pct: number | null;
+  n?: number;
+  r?: number;
+  inferred_from?: string;
+}
+
+export interface TherapyAgent {
+  code: string;
+  name: string;
+  class: string;
+  coverage_pct: number;
+  /** Kept for resistant infections by guidelines (e.g. meropenem). */
+  reserve: boolean;
+  ci_low: number;
+  ci_high: number;
+  not_tested_share: number;
+  not_tested: string[];
+  tier: "good" | "warn" | "bad";
+  organisms: TherapyOrganism[];
+}
+
+export interface Therapy {
+  as_of: string;
+  infection: Infection;
+  infection_label: string;
+  specimen: Specimen;
+  window: { start: string; end: string };
+  scope: { location: string; label: string };
+  used: { location: string; label: string; fell_back: boolean };
+  tried: { location: string; label: string; n: number }[];
+  isolates: number;
+  sufficient: boolean;
+  organisms: { organism: string; n: number; share: number }[];
+  ranked: TherapyAgent[];
+  unranked: TherapyAgent[];
+  method: string;
+}
+
+export interface TherapyQuery {
+  location: string;
+  infection: Infection;
+  sex?: "F" | "M";
+  age_band?: string;
+  hospital_acquired?: boolean;
+  as_of: string;
+}
+
+export interface Carriers {
+  as_of: string;
+  total: number;
+  by_phenotype: Record<string, number>;
+  carriers: CarrierFlag[];
+}
+
+export interface PatientSample {
+  culture_id: string;
+  date: string;
+  ward: string;
+  ward_type: "in" | "out";
+  specimen: Specimen;
+  result: string;
+  admission_date: string | null;
+  hospital_acquired: boolean;
+  isolates: { isolate_id: string; organism: string; phenotypes: string[]; resistant: string[] }[];
+}
+
+export interface Patient {
+  as_of: string;
+  patient_id: string;
+  sex: "F" | "M";
+  birth_year: number;
+  age: number;
+  home_area: string;
+  last_ward: string;
+  last_sample: string;
+  flags: CarrierFlag[];
+  samples: PatientSample[];
+  alerts: AlertSummary[];
+}
+
+export interface SpreadProfile {
+  id: string;
+  organism: string;
+  profile: string;
+  label: string;
+  count: number;
+  wards: string[];
+  colour: number | null;
+}
+
+export interface Spread {
+  as_of: string;
+  start: string;
+  phenotype: string;
+  wards: string[];
+  cases: {
+    isolate_id: string;
+    date: string;
+    ward: string;
+    patient_id: string;
+    organism: string;
+    specimen: Specimen;
+    profile_id: string;
+    hospital_acquired: boolean;
+  }[];
+  profiles: SpreadProfile[];
+  shared: SpreadProfile[];
+  paths: { patient_id: string; samples: { date: string; ward: string; case: boolean }[] }[];
+  alerts: { id: string; type: AlertType; type_label: string; wards: string[]; first_seen: string; title: string }[];
+}
+
+export interface CdsCard {
+  uuid: string;
+  summary: string;
+  indicator: "info" | "warning" | "critical";
+  detail: string;
+  source: { label: string; url: string };
+  links: { label: string; url: string; type: string }[];
+}
+
+export interface CdsService {
+  hook: string;
+  id: string;
+  title: string;
+  description: string;
+}
+
+export type Channel = "webhook" | "email" | "teams";
+export type Role = "clinician" | "infection_control" | "lab";
+
+export interface Subscription {
+  id: string;
+  name: string;
+  role: Role | "system";
+  channel: Channel;
+  target: string;
+  wards: string[] | null;
+  min_severity: Severity;
+  types: AlertType[] | null;
+  include_routine: boolean;
+  events: ("alert" | "carrier_flag" | "digest")[];
+}
+
+export interface Message {
+  day: string;
+  subscription: string;
+  name: string;
+  role: string;
+  channel: Channel;
+  target: string;
+  event: string;
+  subject: string;
+  body: unknown;
+  content_type?: string;
+  ref: string | null;
+}
+
+export interface Delivery {
+  at: string;
+  day?: string;
+  subscription?: string;
+  name?: string;
+  channel?: Channel;
+  target?: string;
+  event?: string;
+  subject?: string;
+  status: string;
+}
+
+export interface Digest {
+  period: "week" | "month";
+  start: string;
+  end: string;
+  new_alerts: number;
+  by_type: Record<string, number>;
+  alerts: { id: string; type_label: string; severity: Severity; wards: string[]; title: string; first_seen: string }[];
+  carrier_reappearances: number;
+  new_carriers: Record<string, number>;
+  active_alerts: number;
+  trends: { significant: string[]; crossed_up: string[] } | null;
+  text: string;
+}
+
 type Params = Record<string, string | number | boolean | undefined>;
 
 async function get<T>(path: string, params: Params = {}, signal?: AbortSignal): Promise<T> {
@@ -430,15 +686,23 @@ async function get<T>(path: string, params: Params = {}, signal?: AbortSignal): 
   return res.json() as Promise<T>;
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    const detail = await res.json().then(
+      (j) => j.detail,
+      () => "",
+    );
+    throw new Error(`${res.status} ${typeof detail === "string" && detail ? detail : res.statusText}`);
+  }
   return res.json() as Promise<T>;
 }
+
+const post = <T,>(path: string, body: unknown) => send<T>("POST", path, body);
 
 export const api = {
   health: () => get<Health>("/health"),
@@ -466,4 +730,29 @@ export const api = {
   ) => get<TrendSeries>("/trends/series", { ...q }, signal),
   overview: (q: OverviewQuery, signal?: AbortSignal) => get<Overview>("/overview", { ...q }, signal),
   ingestHeldBack: (days: number) => post<IngestEntry>(`/ingest/held-back?days=${days}`, {}),
+  therapy: (q: TherapyQuery, signal?: AbortSignal) => get<Therapy>("/therapy", { ...q }, signal),
+  carriers: (q: { as_of: string; location?: string; phenotype?: string; days?: number; limit?: number }, signal?: AbortSignal) =>
+    get<Carriers>("/carriers", { ...q }, signal),
+  patient: (id: string, as_of: string, signal?: AbortSignal) =>
+    get<Patient>(`/patients/${encodeURIComponent(id)}`, { as_of }, signal),
+  spread: (
+    q: { phenotype: string; organism?: string; profile?: string; days: number; as_of: string },
+    signal?: AbortSignal,
+  ) => get<Spread>("/spread", { ...q }, signal),
+  cdsServices: () => get<{ services: CdsService[] }>("/cds-services"),
+  cds: (service: string, body: unknown, as_of: string) =>
+    send<{ cards: CdsCard[] }>("POST", `/cds-services/${service}?as_of=${as_of}`, body),
+  subscriptions: (signal?: AbortSignal) => get<{ subscriptions: Subscription[] }>("/subscriptions", {}, signal),
+  saveSubscription: (s: Subscription) => send<Subscription>("PUT", `/subscriptions/${encodeURIComponent(s.id)}`, s),
+  deleteSubscription: (id: string) => send<{ deleted: string }>("DELETE", `/subscriptions/${encodeURIComponent(id)}`),
+  resetSubscriptions: () => post<{ subscriptions: Subscription[] }>("/subscriptions/reset", {}),
+  testSubscription: (id: string) => post<{ queued: Message }>(`/subscriptions/${encodeURIComponent(id)}/test`, {}),
+  notifications: (q: { as_of: string; days: number; subscription?: string }, signal?: AbortSignal) =>
+    get<{ as_of: string; start: string; messages: Message[] }>("/notifications", { ...q }, signal),
+  deliveries: (signal?: AbortSignal) => get<{ deliveries: Delivery[] }>("/notifications/deliveries", {}, signal),
+  digest: (q: { as_of: string; period: "week" | "month" }, signal?: AbortSignal) =>
+    get<Digest>("/digest", { ...q }, signal),
+  mockInbox: (signal?: AbortSignal) =>
+    get<{ messages: { received: string; payload: Record<string, any> }[] }>("/mock-ehr/inbox", {}, signal),
+  clearMockInbox: () => send<{ cleared: boolean }>("DELETE", "/mock-ehr/inbox"),
 };

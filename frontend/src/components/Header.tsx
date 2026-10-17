@@ -1,20 +1,14 @@
+import { ROLES } from "../lib/roles";
 import { href, type Route } from "../lib/route";
 import { useApp } from "../state/AppContext";
 import { TimeCursor } from "./TimeCursor";
 
-export function Header({ route }: { route: Route }) {
-  const { alertCounts } = useApp();
-  const view = route.view === "alert" ? "alerts" : route.view;
-  const item = (key: Route["view"], label: string, badge?: number) => (
-    <a href={href({ view: key } as Route)} className={`nav-item ${view === key ? "active" : ""}`}>
-      {label}
-      {badge ? (
-        <span className="nav-badge" title={`${badge} new active alert${badge > 1 ? "s" : ""}`}>
-          {badge}
-        </span>
-      ) : null}
-    </a>
-  );
+const VIEW_OF: Partial<Record<Route["view"], Route["view"]>> = { alert: "alerts", patient: "patients" };
+
+export function Header({ route, badge }: { route: Route; badge: number }) {
+  const { role } = useApp();
+  const info = ROLES[role.role];
+  const view = VIEW_OF[route.view] ?? route.view;
   return (
     <header className="topbar">
       <div className="brand">
@@ -34,12 +28,26 @@ export function Header({ route }: { route: Route }) {
         <span className="brand-sub">Antibiotic Efficacy Indicator</span>
       </div>
       <nav className="nav">
-        {item("ward", "My Ward")}
-        {item("alerts", "Alerts", alertCounts?.new)}
-        {item("overview", "Overview")}
-        {item("trends", "Trends")}
-        {item("feed", "Feed status")}
+        {info.nav.map((n) => (
+          <a key={n.view} href={href({ view: n.view } as Route)} className={`nav-item ${view === n.view ? "active" : ""}`}>
+            {n.label}
+            {n.view === "alerts" && badge > 0 ? (
+              <span className="nav-badge" title={`${badge} new active alert${badge > 1 ? "s" : ""}`}>
+                {badge}
+              </span>
+            ) : null}
+          </a>
+        ))}
       </nav>
+      <div className="role-chip">
+        <a href={href({ view: "start" })} title="Switch role">
+          {info.label}
+          {role.ward ? ` · ${role.ward}` : ""}
+        </a>
+        <a href={href({ view: "ehr" })} className="muted small" title="AEI inside a mock hospital patient record (demo)">
+          EHR demo
+        </a>
+      </div>
       <TimeCursor />
     </header>
   );

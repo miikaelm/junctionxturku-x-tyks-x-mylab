@@ -4,12 +4,14 @@ import { fmtP, SeverityPill, TRIAGE_TEXT, TriagePill } from "../components/Alert
 import { BarChart } from "../components/BarChart";
 import { fmtDate, shortOrganism } from "../lib/format";
 import { useFetch } from "../lib/hooks";
+import { ROLES } from "../lib/roles";
 import { href } from "../lib/route";
 import { useApp } from "../state/AppContext";
 
 /** V4 Alert detail / outbreak investigation: why it fired, timeline, cases, triage. */
 export function AlertDetailView({ id }: { id: string }) {
-  const { asOf, alertsVersion, meta } = useApp();
+  const { asOf, alertsVersion, meta, role } = useApp();
+  const patientLevel = ROLES[role.role].patientLevel;
   const { data, error, loading } = useFetch(
     (signal) => api.alert(id, asOf, signal),
     [id, asOf, alertsVersion, meta.data_version],
@@ -32,7 +34,7 @@ export function AlertDetailView({ id }: { id: string }) {
           <section className="ward-head">
             <div>
               <p className="eyebrow">
-                {data.type_label} · {data.ward} {data.ward_en}
+                {data.type_label} · {data.wards.length > 1 ? data.wards.join(", ") : `${data.ward} ${data.ward_en}`}
               </p>
               <h1 className="alert-title">{data.title}</h1>
               <p className="ward-sub">
@@ -58,6 +60,8 @@ export function AlertDetailView({ id }: { id: string }) {
             <TriagePanel alert={data} />
           </div>
 
+          {data.similarity && <SimilarityCard s={data.similarity} />}
+
           <section className="card pad">
             <BarChart timeline={data.timeline} />
           </section>
@@ -65,10 +69,23 @@ export function AlertDetailView({ id }: { id: string }) {
           {data.cases.length > 0 && (
             <section className="card pad">
               <h2>
-                Cases <span className="muted">({data.cases.length})</span>
+                {data.type === "carrier" ? "Positive results behind the carrier flag" : "Cases"}{" "}
+                <span className="muted">({data.cases.length})</span>
               </h2>
-              <CaseTable alert={data} />
+              {patientLevel ? (
+                <CaseTable alert={data} />
+              ) : (
+                <p className="muted">
+                  {data.cases.length} case{data.cases.length > 1 ? "s" : ""},{" "}
+                  {data.cases.filter((c) => c.hospital_acquired).length} hospital-acquired. The patient-level line list
+                  is for infection control and the lab (switch role to see it).
+                </p>
+              )}
             </section>
+          )}
+
+          {data.followup && data.followup.wards.length > 0 && (
+            <FollowupCard alert={data} patientLevel={patientLevel} />
           )}
 
           {data.history.length > 1 && (
@@ -100,6 +117,7 @@ function est(e: Estimate) {
 
 /** Plain-language explanation of the evidence (ANOM-06), per alert type. */
 function Why({ alert }: { alert: AlertDetail }) {
+  const { role } = useApp();
   // Evidence fields differ per alert type (see the detectors' docstrings).
   const ev = alert.evidence as Record<string, any>;
   const win = ev.window ? `${fmtDate(ev.window.start)} – ${fmtDate(ev.window.end)}` : "";
@@ -205,6 +223,83 @@ function Why({ alert }: { alert: AlertDetail }) {
           <dd>Alert when not seen on the ward for at least {ev.min_gap_days} days. Fires on the first case, before any cluster statistics can.</dd>
         </dl>
       );
+    case "carrier":
+      return (
+        <dl className="facts">
+          <dt>Patient</dt>
+          <dd>
+            {ROLES[role.role].patientLevel ? (
+              <a href={href({ view: "patient", id: ev.patient_id })} className="mono">
+                {ev.patient_id}
+              </a>
+            ) : (
+              <span className="mono">{ev.patient_id}</span>
+            )}{" "}
+            sampled here ({ev.specimen}
+            {ev.inpatient ? `, admitted ${fmtDate(ev.admission_date)}` : ", outpatient"})
+          </dd>
+          <dt>Known carrier of</dt>
+          <dd>
+            {(ev.flags as any[]).map((f) => (
+              <span key={f.phenotype} className="block">
+                <strong>{f.phenotype}</strong> ({f.organisms.map(shortOrganism).join(", ")}): first positive{" "}
+                {fmtDate(f.first_positive)} on {f.first_ward}
+                {f.positives > 1 && `, ${f.positives} positives, last ${fmtDate(f.last_positive)} on ${f.last_ward}`}
+              </span>
+            ))}
+          </dd>
+          {ev.previous_sample && (
+            <>
+              <dt>Seen before on</dt>
+              <dd>
+                {ev.previous_sample.ward}, {fmtDate(ev.previous_sample.date)} (from sample dates; no transfer records)
+              </dd>
+            </>
+          )}
+          <dt>Action</dt>
+          <dd>Contact precautions per the local guideline, from the sample day, before the culture result.</dd>
+          <dt>Rule</dt>
+          <dd>
+            Any new sample of a known carrier on a hospital ward that hasn't sampled them in the last {ev.revisit_days}{" "}
+            days.
+          </dd>
+        </dl>
+      );
+    case "multi_ward":
+      return (
+        <dl className="facts">
+          <dt>Strain type</dt>
+          <dd>
+            {ev.phenotype} {ev.organism}, {ev.profile_label} (urine-only agents left out so specimens compare)
+          </dd>
+          <dt>Wards</dt>
+          <dd>
+            {Object.entries(ev.by_ward as Record<string, number>)
+              .map(([w, n]) => `${w} ${n}`)
+              .join(", ")}{" "}
+            in {win}
+          </dd>
+          <dt>Observed</dt>
+          <dd>
+            <strong>{ev.observed}</strong> cases vs {ev.expected} expected hospital-wide (from {ev.baseline.cases} in the{" "}
+            {ev.baseline.days} days before)
+          </dd>
+          <dt>Outside {ev.outside_main.ward}</dt>
+          <dd>
+            {ev.outside_main.observed} cases vs {ev.outside_main.expected} expected (p {fmtP(ev.p_outside)}): the excess
+            is not confined to one ward
+          </dd>
+          <dt>Significance</dt>
+          <dd>
+            p {fmtP(ev.p_value)}, after false-discovery correction q {fmtP(ev.q_value)}
+          </dd>
+          <dt>Caution</dt>
+          <dd>
+            Co-occurrence, not proof of transmission: the data has no transfer records, so the direction of spread is
+            unknown. {ev.patients_on_several_wards > 0 && `${ev.patients_on_several_wards} patient(s) were sampled on several of these wards.`}
+          </dd>
+        </dl>
+      );
     case "data_gap":
       return (
         <dl className="facts">
@@ -285,6 +380,8 @@ function TriagePanel({ alert }: { alert: AlertDetail }) {
 
 function CaseTable({ alert }: { alert: AlertDetail }) {
   const highlight = alert.type === "rate_shift" ? (alert.evidence.antibiotic_code as string) : null;
+  const profiles = alert.similarity !== null;
+  const dominant = alert.similarity?.dominant.key;
   return (
     <div className="table-scroll">
       <table className="table compact">
@@ -298,13 +395,16 @@ function CaseTable({ alert }: { alert: AlertDetail }) {
             <th>Organism</th>
             <th>Day of stay</th>
             <th>Resistant to</th>
+            {profiles && <th>Profile</th>}
           </tr>
         </thead>
         <tbody>
           {alert.cases.map((c) => (
             <tr key={c.isolate_id} className={c.highlight ? "is-hit" : ""}>
               <td className="mono nowrap">{c.date}</td>
-              <td className="mono">{c.patient_id}</td>
+              <td className="mono">
+                <a href={href({ view: "patient", id: c.patient_id })}>{c.patient_id}</a>
+              </td>
               <td>
                 {c.sex} {c.age}
               </td>
@@ -332,6 +432,11 @@ function CaseTable({ alert }: { alert: AlertDetail }) {
                     ))
                   : "–"}
               </td>
+              {profiles && (
+                <td className={`small ${c.profile === dominant ? "profile-main" : ""}`}>
+                  {c.profile === undefined ? "–" : c.profile === dominant ? "main profile" : "differs"}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -341,5 +446,92 @@ function CaseTable({ alert }: { alert: AlertDetail }) {
         later). Patient-level data: for infection control and lab use.
       </p>
     </div>
+  );
+}
+
+/** How alike the cases' resistance profiles are, against the background (ANOM-05). */
+function SimilarityCard({ s }: { s: NonNullable<AlertDetail["similarity"]> }) {
+  const tone = s.verdict === "single_strain" ? "bad" : s.verdict === "common_profile" ? "warn" : "none";
+  return (
+    <section className="card pad">
+      <h2>Same strain? Resistance profiles of the cases</h2>
+      <p className={`verdict verdict-${tone}`}>{s.text}</p>
+      <div className="table-scroll">
+        <table className="table compact">
+          <thead>
+            <tr>
+              <th>Profile ({shortOrganism(s.organism)})</th>
+              <th>Cases</th>
+            </tr>
+          </thead>
+          <tbody>
+            {s.groups.map((g) => (
+              <tr key={g.key} className={g.key === s.dominant.key ? "row-strong" : ""}>
+                <td>{g.label}</td>
+                <td className="mono">{g.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="muted small">
+        {s.matching} of {s.cases} match the main profile on every agent both were tested for
+        {s.mean_agreement !== null && `; on average two cases agree on ${Math.round(100 * s.mean_agreement)} % of shared agents`}.
+        {s.background.share !== null
+          ? ` Background: ${s.background.matching} of ${s.background.isolates} similar isolates elsewhere (${fmtDate(s.background.start)} – ${fmtDate(s.background.end)}) had it; p ${fmtP(s.p_value ?? undefined)}.`
+          : " Too few similar isolates elsewhere to say how unusual the profile is."}
+        {s.other_organisms > 0 && ` ${s.other_organisms} case(s) of other organisms not compared.`}
+      </p>
+      <p className="muted small method">Method: {s.method}</p>
+    </section>
+  );
+}
+
+/** Where the patients behind the alert were sampled next (PAT-03), as a follow-up list. */
+function FollowupCard({ alert, patientLevel }: { alert: AlertDetail; patientLevel: boolean }) {
+  const f = alert.followup!;
+  const seen = f.patients.length;
+  return (
+    <section className="card pad">
+      <h2>
+        Where they were sampled next <span className="muted">(within {f.days} days, other wards)</span>
+      </h2>
+      <p>
+        {seen} of {f.case_patients} patient{f.case_patients > 1 ? "s" : ""} turned up on other wards afterwards:{" "}
+        {f.wards.map((w) => `${w.ward} (${w.patients}, from ${fmtDate(w.first)})`).join(", ")}.
+      </p>
+      {patientLevel ? (
+        <details className="small">
+          <summary>Follow-up list ({seen} patients)</summary>
+          <table className="table compact">
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>Case</th>
+                <th>Then sampled on</th>
+              </tr>
+            </thead>
+            <tbody>
+              {f.patients.map((p) => (
+                <tr key={p.patient_id}>
+                  <td className="mono">
+                    <a href={href({ view: "patient", id: p.patient_id })}>{p.patient_id}</a>
+                  </td>
+                  <td className="nowrap">
+                    {p.case_ward}, {p.case_date}
+                  </td>
+                  <td>{p.seen.map((s) => `${s.ward} ${s.date}`).join(" → ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      ) : null}
+      <p className="muted small">
+        From sample dates only: there are no admission or transfer records, so this shows where patients were seen, not
+        how they moved or whether they carried the strain there.{" "}
+        {alert.type !== "carrier" && <a href={href({ view: "spread" })}>Open the spread view →</a>}
+      </p>
+    </section>
   );
 }

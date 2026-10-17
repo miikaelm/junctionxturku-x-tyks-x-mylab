@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.alerts import engine
+from app.api.cds import router as cds_router
 from app.api.routes import router
 from app.data.store import get_store
 
@@ -26,3 +27,4 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(router)
+app.include_router(cds_router)

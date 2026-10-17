@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { AlertCounts, AlertSummary, Meta } from "../api/client";
+import type { RoleSetting } from "../lib/roles";
 
 export interface AppState {
   meta: Meta;
@@ -19,6 +20,9 @@ export interface AppState {
   clearNews: () => void;
   /** Ask the backend now whether new data arrived (DATA-05), instead of at the next poll. */
   checkForData: () => void;
+  /** Who is using the app (VIEW-08): decides the home view, the nav and patient-level data. */
+  role: RoleSetting;
+  setRole: (role: RoleSetting | null) => void;
 }
 
 export const AppContext = createContext<AppState | null>(null);

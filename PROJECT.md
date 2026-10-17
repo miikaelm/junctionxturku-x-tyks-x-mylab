@@ -133,29 +133,29 @@ All detectors run automatically on every update (or as-of change) with general m
 - [x] **ANOM-02 (M) Sudden resistance-rate shift.** The resistance % for an organism–antibiotic pair on a ward (last 4 weeks) differs significantly from its baseline (previous 12 months). Methods: binomial / Fisher exact test, CUSUM on proportions, minimum-n gate.
 - [x] **ANOM-03 (M) Slow drift / long-term trend.** Gradual increase over months or years. Methods: logistic regression on time, Mann-Kendall or Cochran-Armitage trend test. Also flags **threshold crossings** (e.g. empirical agent passing the commonly used **20 % resistance** limit). This is the stewardship workflow (V6), not a daily alert.
 - [x] **ANOM-04 (M) Data-quality gap.** Sample volume per ward per day/week far below expected, or zero for several days. Distinguish "no resistance" from "no data". Shown in V7 and as the freshness badge / warning on affected views.
-- [ ] **ANOM-05 (S)** Cluster evidence: similarity of resistance profiles between cases in a cluster (same antibiogram pattern → likely same strain).
+- [x] **ANOM-05 (S)** Cluster evidence: similarity of resistance profiles between cases in a cluster (same antibiogram pattern → likely same strain).
 - [x] **ANOM-06 (S)** Each alert records **why** it fired (observed vs expected, method, p-value or score) for display in V4 and for the AI explanation.
 - [x] **ANOM-07 (S)** Measure **detection latency** on replay: days from event start to first alert.
 - [x] **ANOM-08 (S)** **Novelty alert ("not seen here for a long time / ever"):** a phenotype (MRSA/ESBL/VRE/CPE) or rare organism appears on a ward where it hasn't been seen for a configurable period, or never before. The mentor's example was "not seen in 20 years"; our data covers only 3 years, so the longest possible lookback is "first since records began". Fires on the *first* case, before outbreak statistics can. Skip common organisms to avoid noise.
-- [ ] **ANOM-09 (S)** **Multi-ward signal:** the same phenotype with a similar resistance profile appears on ≥ 2 wards within a configurable window. Flags possible spread for infection control without claiming direction ("seen on URO and GER"), and feeds V10.
+- [x] **ANOM-09 (S)** **Multi-ward signal:** the same phenotype with a similar resistance profile appears on ≥ 2 wards within a configurable window. Flags possible spread for infection control without claiming direction ("seen on URO and GER"), and feeds V10.
 
 ### 4.4 Notifications & sentinel events (NOTIF)
 - [x] **NOTIF-01 (M)** **Rare sentinel events trigger immediately**, without statistics: any CPE, any VRE, any carbapenem (meropenem) resistance, any vancomycin resistance. One case = one alert.
 - [x] **NOTIF-02 (M)** In-app alert badge and inbox (V3), plus the alert strip on the affected ward's V1 page.
-- [ ] **NOTIF-03 (S)** Subscriptions by role and ward (e.g. infection control gets all wards; a ward doctor gets their own ward). Whether ward doctors should also see other wards' alerts: ask the mentor (§10.1).
+- [x] **NOTIF-03 (S)** Subscriptions by role and ward (e.g. infection control gets all wards; a ward doctor gets their own ward). Whether ward doctors should also see other wards' alerts: ask the mentor (§10.1).
 - [x] **NOTIF-04 (S)** Severity levels (e.g. sentinel = critical, outbreak = high, carrier re-appearance = high, rate shift = medium, novelty = medium, trend = info / periodic digest).
-- [ ] **NOTIF-05 (S)** **Simulated external delivery** (email / push / Teams message / webhook to other systems, see API-04) and a weekly or monthly digest for trend findings. Important for the "fits existing workflow" story.
+- [x] **NOTIF-05 (S)** **Simulated external delivery** (email / push / Teams message / webhook to other systems, see API-04) and a weekly or monthly digest for trend findings. Important for the "fits existing workflow" story.
 - [x] **NOTIF-06 (S)** Alert triage workflow: new → investigating → confirmed / dismissed, with dismissed alerts suppressing duplicates.
 
 ### 4.5 Views & usability (VIEW)
 - [~] **VIEW-01 (M)** V1 My Ward, as described in §3, with 4-week and 12-month side by side. **Visual quality is a priority.**
 - [~] **VIEW-02 (M)** Filters on dataset parameters: ward, ward type (in/out), institution, specimen, organism, antibiotic, sex, age band, hospital-acquired, period.
 - [x] **VIEW-03 (M)** V3 Alert inbox and V4 Alert detail.
-- [ ] **VIEW-04 (S)** V2 Therapy-helper mode inside V1 (❓ see "weighted syndromic antibiogram" in §11).
+- [x] **VIEW-04 (S)** V2 Therapy-helper mode inside V1 (❓ see "weighted syndromic antibiogram" in §11).
 - [x] **VIEW-05 (S)** V5 Ward × time heatmap.
 - [x] **VIEW-06 (M)** V6 Trend explorer, with threshold lines and year-vs-year comparison.
 - [x] **VIEW-07 (M)** V7 Data quality / feed status.
-- [ ] **VIEW-08 (S)** Role-based entry: choose one of the 3 roles → land on that role's home view.
+- [x] **VIEW-08 (S)** Role-based entry: choose one of the 3 roles → land on that role's home view.
 - [~] **VIEW-09 (S)** Clinician-first UX: core answer reachable in ≤ 2 clicks, readable on a tablet or phone, plain-language labels, consistent colour meaning (green = likely effective, red = high resistance, grey = insufficient data).
 - [ ] **VIEW-10 (C)** Finnish / English language toggle (the data already contains Finnish names). Optional.
 - [ ] **VIEW-11 (C)** Export: annual report (PDF/CSV).
@@ -176,16 +176,16 @@ All detectors run automatically on every update (or as-of change) with general m
 ### 4.8 Non-functional (NF)
 - [~] **NF-01 (M)** Views respond in < 2 s on the full dataset.
 - [~] **NF-02 (M)** Runs locally for the demo with no internet dependency (except optional AI).
-- [ ] **NF-03 (S)** Privacy by design: prescriber views show aggregates only; patient-level line lists only in infection-control / lab roles and patient-context API calls. The data is synthetic, but design as if it were real.
+- [~] **NF-03 (S)** Privacy by design: prescriber views show aggregates only; patient-level line lists only in infection-control / lab roles and patient-context API calls. The data is synthetic, but design as if it were real.
 - [~] **NF-04 (S)** Detection thresholds are configurable, not magic numbers in code.
 
 ### 4.9 Patient-level risk & spread (PAT)
 The mentor's "grandma" story: a carrier moves Loimaa hospital → Tyks → nursing home and spreads
 the bacteria along the way. The receiving unit should know. Carrier information reaches other
 systems mainly through the API (§4.10); how Tyks handles it today is an open question (§10.1).
-- [ ] **PAT-01 (M)** **Carrier registry:** derived automatically from results; any patient positive for MRSA / ESBL / VRE / CPE gets a carrier flag (organism, phenotype, first positive date, ward). Required by API-03.
-- [ ] **PAT-02 (S)** **Carrier re-appearance alert (in-tool):** when a known carrier gets a new sample on any ward / institution, notify that ward (contact precautions). Demonstrable on current data: 352 of 491 ESBL carriers and 70 of 110 MRSA carriers later appear on a different ward.
-- [ ] **PAT-03 (S)** **Spread / footprint view (V10) for infection control:** for a chosen organism, phenotype or resistance profile:
+- [x] **PAT-01 (M)** **Carrier registry:** derived automatically from results; any patient positive for MRSA / ESBL / VRE / CPE gets a carrier flag (organism, phenotype, first positive date, ward). Required by API-03.
+- [x] **PAT-02 (S)** **Carrier re-appearance alert (in-tool):** when a known carrier gets a new sample on any ward / institution, notify that ward (contact precautions). Demonstrable on current data: 352 of 491 ESBL carriers and 70 of 110 MRSA carriers later appear on a different ward.
+- [x] **PAT-03 (S)** **Spread / footprint view (V10) for infection control:** for a chosen organism, phenotype or resistance profile:
   - timeline with one row per ward and a dot per case, coloured by resistance profile, so the same profile on several wards stands out (ANOM-09);
   - each patient's sample path across wards, drawn as lines between their dots;
   - "where did they go next": for a cluster (e.g. the URO ESBL outbreak), the wards where its patients were sampled afterwards, as a follow-up list for infection control.
@@ -201,11 +201,11 @@ directions:
 - **Push:** we send events, such as "patient X is a flagged carrier" or a new alert, to the other system's endpoint.
 
 The UI itself is a client of the same API.
-- [~] **API-01 (M)** REST API exposing the same statistics and alerts the UI uses.
-- [ ] **API-02 (M)** **Prescribing context (pull,** `order-select` **style):** given ward + infection/specimen type (+ sex, age) and optionally the chosen antibiotic → resistance summary and active alerts as cards. E.g. "Ciprofloxacin: 25 % resistance in URO E. coli, last 4 weeks; active ESBL cluster on this ward."
-- [ ] **API-03 (M)** **Patient context (pull,** `patient-view` **style):** given a patient id → carrier flags and relevant alerts. E.g. "Known ESBL carrier (positive 2025-06, URO). Use contact precautions."
-- [ ] **API-04 (M)** **Push / webhooks:** send new alerts and new carrier flags to registered external endpoints, e.g. a mock "Tyks" receiver. Implements NOTIF-05.
-- [ ] **API-05 (M)** V11 mock patient-record page that calls the API and renders the cards (demo).
+- [x] **API-01 (M)** REST API exposing the same statistics and alerts the UI uses.
+- [x] **API-02 (M)** **Prescribing context (pull,** `order-select` **style):** given ward + infection/specimen type (+ sex, age) and optionally the chosen antibiotic → resistance summary and active alerts as cards. E.g. "Ciprofloxacin: 25 % resistance in URO E. coli, last 4 weeks; active ESBL cluster on this ward."
+- [x] **API-03 (M)** **Patient context (pull,** `patient-view` **style):** given a patient id → carrier flags and relevant alerts. E.g. "Known ESBL carrier (positive 2025-06, URO). Use contact precautions."
+- [x] **API-04 (M)** **Push / webhooks:** send new alerts and new carrier flags to registered external endpoints, e.g. a mock "Tyks" receiver. Implements NOTIF-05.
+- [x] **API-05 (M)** V11 mock patient-record page that calls the API and renders the cards (demo).
 
 ### 4.11 Extension data (EXT) *(proposed)*
 We may generate our own data and plant our own scenarios on top of the organizers' data to
@@ -327,6 +327,19 @@ TMP by onset (hospital-acquired 25 % vs 18 %) and in/outpatient (24 % vs 18 %), 
 CLI by ward (ICU 16 % vs ED 0 %). 11 upward crossings of 20 % in the last 12 months; only URO
 K. pneumoniae TMP (14 % → 32 %) has its whole interval above 20 %, the rest are within noise.
 
+**Slice 4 results** (checked by `backend/tests/test_slice4.py`)
+
+| # | Result |
+|---|---|
+| E1 | Profile similarity (ANOM-05): 26 of 29 E. coli cases share R: AMP CIP CRO CXM TMP, a profile 20 % of ESBL E. coli elsewhere had in the year before (p 2e-15) → "consistent with a single strain". 12 of the 30 case patients were sampled on other wards within 90 days (MED-A 4, ED 4, PHC-S 3, …). |
+| E2 | 12 of 13 MRSA cases share R: CLI FOX vs 9 % of MRSA elsewhere (p 3e-12) → single strain. |
+| E6 | Carrier registry (PAT-01): 491 ESBL, 110 MRSA, 12 CPE, 5 VRE carriers. Carrier re-appearance (PAT-02): 1,336 alerts over 3 years on hospital wards (~8.5 a week, ~1 per ward); routine, so kept out of the badge and replay pauses. |
+| ANOM-09 | Multi-ward signal: 1 firing in 3 years on the organizers' data (ESBL K. pneumoniae R: CIP CRO CXM TZP on GER, MED-A, PHC-N in April 2025, 3 cases); the data has no planted spread. A planted two-ward spread (3 + 3 cases in 10 days, test only) is found. |
+
+Other slice-4 findings: the MED-A ESBL cluster (Apr 2025, not in the answer key) has mixed profiles (2 of 3 match), so
+it is probably not one strain. Therapy helper: on most wards no agent reaches 90 % coverage for UTIs, because
+E. faecalis (~10 %) is never tested for most agents and counts as not covered.
+
 ---
 
 ## 9. Decisions log
@@ -366,6 +379,15 @@ K. pneumoniae TMP (14 % → 32 %) has its whole interval above 20 %, the rest ar
 | 2026-10-17 | **DATA-05 ingestion:** batches in the CSV schema (`POST /api/ingest`), validated as a whole (keys, references, S/R only); only new rows are joined; the alert engine keeps firings before the batch's earliest sample date and re-runs the detectors from there (tested equal to a full rebuild). "Today" is now the last sample received (`AEI_AS_OF` can pin it); clients poll `/api/status` and follow. `AEI_HOLD_BACK_FROM` holds data back at startup so the feed status page can receive it day by day (demo). |
 | 2026-10-17 | **V5 overview:** wards × weeks of new ESBL / MRSA / VRE / CPE cases, or a key resistance rate (EARS-Net-style indicators in config) per 4-week block or quarter, with % only at n ≥ 30. Cells are ringed where an alert was raised. |
 
+| 2026-10-17 | **VIEW-08 roles** moved into slice 4 (user request). A role picker on first visit (no login; in production the role comes from SSO). Clinician → My Ward with their own ward, nav limited to My Ward and Alerts, aggregates only; Infection control → Alerts; Lab & stewardship → Feed status. Patient-level views (line lists, carriers, spread, patient pages) are hidden in the clinician role (NF-03, UI-level only: the API itself is not access-controlled yet). |
+| 2026-10-17 | **PAT-01/02 carriers:** a patient is a carrier from their first MRSA/ESBL/VRE/CPE positive; flags don't expire (config `CARRIER_FLAG_DAYS`; clearing needs screening data we don't have). A known carrier's new sample on a **hospital** ward raises a "known carrier sampled" alert on the sample day, unless the ward sampled them in the last 30 days. Severity medium and **routine**: ~1 per ward per week, so these are shown to the ward and in their own inbox section, but don't count in the infection-control badge, the replay jump list or pause-on-alert. Health-centre visits don't alert (standard precautions). |
+| 2026-10-17 | **ANOM-05 profiles:** profile = agents resistant among those tested, intrinsic resistance left out; two isolates match when they agree on every agent both were tested for (≥ 3). A cluster is "consistent with a single strain" when ≥ 70 % of its cases match the dominant profile and a binomial test against the same phenotype × organism in the previous year gives p < 0.01. Shown in V4, not used to raise or suppress alerts. |
+| 2026-10-17 | **ANOM-09 multi-ward:** per phenotype × organism × core profile (urine-only agents left out so specimens compare), 28-day window vs the hospital-wide baseline (Poisson, BH FDR across active profiles), and the cases outside the busiest ward must also exceed their own expected count (p < 0.05, ≥ 2 cases). Without that second test every single-ward cluster of a common profile would also read as "multi-ward". Alert ward = several (listed); severity high; no direction claimed. |
+| 2026-10-17 | **V2 therapy helper (WISCA):** coverage = Σ organism share × susceptibility over first isolates of the infection's specimen in the last 12 months, for the ward's population matching the patient filters, falling back ward → institution → all below 30 isolates. 95 % interval by Monte Carlo (Dirichlet shares × Beta susceptibilities, Jeffreys priors). Intrinsic resistance and never-tested pairs count as not covered (agents untested on > 50 % of the population are listed apart). The FOX screen is not offered; S. aureus β-lactams are inferred from it (EUCAST expert rule). Reserve agents (meropenem) are tagged. Shown inside My Ward using its ward, specimen and patient filters. |
+| 2026-10-17 | **API-02/03 CDS Hooks:** discovery at `GET /api/cds-services`; `aei-antibiotic-choice` (order-select) and `aei-patient-context` (patient-view) return standard cards (summary, indicator, detail, source, links). The context takes plain fields (ward, infection, sex, age, antibiotic) next to `patientId` and a FHIR `draftOrders` bundle; `as_of` as a query parameter keeps replay consistent. |
+| 2026-10-17 | **NOTIF-03/05, API-04 delivery:** subscriptions (role, wards, minimum severity, types, routine on/off, events alert / carrier_flag / digest, channel webhook / email / Teams) in `backend/.state/subscriptions.json`, seeded with five demo recipients. Messages derive from the alert timeline, so the notifications view shows what was sent up to the time cursor (replay-consistent). Live delivery happens on ingest: webhooks are real HTTP POSTs (the mock patient record's inbox receives them); email and Teams are simulated (logged). Weekly digest on Mondays. |
+| 2026-10-17 | **Alert chart window:** an alert's chart now ends 4 weeks after its last signal (or at as-of), so an old alert shows its own period instead of the weeks before today. |
+
 ## 10. To-do & open questions
 
 ### 10.1 To-do list
@@ -376,7 +398,8 @@ K. pneumoniae TMP (14 % → 32 %) has its whole interval above 20 %, the rest ar
 - [ ] Roles: are our 3 roles the right ones? Is there a stewardship team at Tyks that would use trends (VIEW-08, R3)?
 - [ ] Local empirical-therapy threshold: is ~20 % the convention in Finland / at Tyks?
 - [x] ~~"Bacteria not seen for 20 minutes": what time scale?~~ Resolved: years (see ANOM-08).
-- [ ] How is carrier status (MRSA/ESBL risk information) handled in patient records today? Would they prefer we push carrier flags to their system, or that their system queries ours (API-03/04)?
+- [ ] How is carrier status (MRSA/ESBL risk information) handled in patient records today? Would they prefer we push carrier flags to their system, or that their system queries ours (API-03/04)? (Both are built.) When is a flag cleared, and do health centres need carrier alerts too?
+- [ ] Therapy helper: which agents are reserve agents locally, and should untested organisms (E. faecalis) count as not covered?
 - [ ] Varha scope: should the pitch position the tool as Varha-wide (all hospitals, health centres, elderly care), or Tyks-only?
 
 **Team:**
@@ -437,6 +460,6 @@ Work is split into vertical slices, one commit series each. Update the status he
 | 1 | Data layer + statistics engine + V1 My Ward | DATA-01–04, 06, 07 · STAT-01–05 · LIVE-01 · VIEW-01/02/12 (core) · API `/meta`, `/antibiogram`, `/freshness` | done |
 | 2 | Detectors + alerts | NOTIF-01/02/04/06 · ANOM-01, 02, 04, 06, 08 · STAT-08 · V3 inbox, V4 detail, V1 alert strip, V7 feed status | done |
 | 3 | Replay, trends, discovery | LIVE-02/04 · ANOM-03, 07 · V6 trends, V5 heatmap · STAT-07 defaults, STAT-09 · DATA-05 incremental | done |
-| 4 | Patients + integration | PAT-01–03 · API-02–05 · NOTIF-03/05 · V2 therapy helper · V10 spread · V11 mock EHR · ANOM-05/09 | next |
-| 5 | Usability optimization | UX-01–04 (Varha design, exceptions-first view, drill-down, visual polish) · VIEW-08 roles · VIEW-09 | |
+| 4 | Patients + integration | PAT-01–03 · API-02–05 · NOTIF-03/05 · V2 therapy helper · V10 spread · V11 mock EHR · ANOM-05/09 · VIEW-08 roles (moved up from slice 5) | done |
+| 5 | Usability optimization | UX-01–04 (Varha design, exceptions-first view, drill-down, visual polish) · role landing pages polish · VIEW-09 | next |
 | 6 | AI, extension data, delivery | AI-01–04 · EXT-* · README, demo presets | |

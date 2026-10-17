@@ -29,9 +29,11 @@ from app.config import (
 )
 from app.data import store as data_store
 from app.data.dataset import Dataset
+from app.detectors.carrier import detect_carriers
 from app.detectors.cluster import detect_clusters
 from app.detectors.common import Firing
 from app.detectors.data_gap import detect_data_gaps
+from app.detectors.multi_ward import MULTI_WARD, detect_multi_ward
 from app.detectors.novelty import detect_novelty
 from app.detectors.rate_shift import detect_rate_shifts
 
@@ -41,6 +43,8 @@ DETECTORS = [
     detect_rate_shifts,
     detect_novelty,
     detect_data_gaps,
+    detect_carriers,
+    detect_multi_ward,
 ]
 
 
@@ -67,6 +71,12 @@ class Episode:
 
     def up_to(self, as_of: date) -> list[Firing]:
         return [f for f in self.firings if f.day <= as_of]
+
+    def wards(self, as_of: date) -> list[str]:
+        """The wards this alert concerns: one, or several for a multi-ward signal (ANOM-09)."""
+        if self.ward != MULTI_WARD:
+            return [self.ward]
+        return list(dict.fromkeys(w for f in self.up_to(as_of) for w in f.evidence["wards"]))
 
 
 def build_episodes(ds: Dataset, firings: list[Firing]) -> list[Episode]:
@@ -143,20 +153,27 @@ def update(old: Dataset, new: Dataset, since: date | None) -> None:
 data_store.INGEST_HOOKS.append(update)
 
 
-def summarize(ds: Dataset, episode: Episode, as_of: date, store: TriageStore) -> dict:
+def summarize(
+    ds: Dataset, episode: Episode, as_of: date, store: TriageStore, ward_names: dict | None = None
+) -> dict:
     fs = episode.up_to(as_of)
     cfg = ALERT_TYPES[episode.type]
     last = fs[-1]
     active = (as_of - last.day).days <= cfg["active_days"]
     triage = store.current(episode.id, as_of)
-    ward_names = ds.wards.set_index("ward_code").ward_en
+    if ward_names is None:
+        ward_names = _ward_names(ds)
     return {
         "id": episode.id,
         "type": episode.type,
         "type_label": cfg["label"],
         "severity": cfg["severity"],
+        "routine": is_routine(episode.type),
         "ward": episode.ward,
-        "ward_en": ward_names.get(episode.ward, episode.ward),
+        "ward_en": "Several wards"
+        if episode.ward == MULTI_WARD
+        else ward_names.get(episode.ward, episode.ward),
+        "wards": episode.wards(as_of),
         "subject": episode.subject,
         "title": last.title,
         "first_seen": episode.first.isoformat(),
@@ -188,20 +205,27 @@ def alerts_at(
     include_resolved: bool = False,
 ) -> list[dict]:
     """Alerts as they stood on `as_of`, most urgent first."""
-    summaries = [summarize(ds, e, as_of, store) for e in timeline(ds, as_of) if e.first <= as_of]
+    names = _ward_names(ds)
+    summaries = [
+        summarize(ds, e, as_of, store, names) for e in timeline(ds, as_of) if e.first <= as_of
+    ]
     _suppress_dismissed_duplicates(summaries)
 
     lookback = (as_of - timedelta(days=RESOLVED_LOOKBACK_DAYS)).isoformat()
     out = [
         s
         for s in summaries
-        if (wards is None or s["ward"] in wards)
+        if (wards is None or not wards.isdisjoint(s["wards"]))
         and (types is None or s["type"] in types)
         and (s["state"] == "active" or (include_resolved and s["last_seen"] >= lookback))
     ]
     out.sort(key=lambda s: s["last_seen"], reverse=True)
     out.sort(key=lambda s: (s["state"] != "active", SEVERITY_ORDER.index(s["severity"])))
     return out
+
+
+def _ward_names(ds: Dataset) -> dict:
+    return ds.wards.set_index("ward_code").ward_en.to_dict()
 
 
 def _suppress_dismissed_duplicates(summaries: list[dict]) -> None:
@@ -224,11 +248,21 @@ def find_episode(ds: Dataset, alert_id: str, as_of: date) -> Episode | None:
     return next((e for e in timeline(ds, as_of) if e.id == alert_id and e.first <= as_of), None)
 
 
+def is_routine(alert_type: str) -> bool:
+    return bool(ALERT_TYPES[alert_type].get("routine"))
+
+
 def counts(alerts: list[dict]) -> dict:
+    """Active alerts by triage and severity. Routine types (carrier re-appearances) are counted
+    apart, so they don't drown the signals in the "new" badge."""
     active = [a for a in alerts if a["state"] == "active"]
+    routine = [a for a in active if is_routine(a["type"])]
+    active = [a for a in active if not is_routine(a["type"])]
     return {
         "active": len(active),
         "new": sum(a["triage"]["status"] == "new" for a in active),
+        "routine": len(routine),
+        "routine_new": sum(a["triage"]["status"] == "new" for a in routine),
         "by_severity": {
             sev: sum(a["severity"] == sev for a in active)
             for sev in SEVERITY_ORDER
@@ -242,9 +276,10 @@ def replay_events(ds: Dataset, today: date, store: TriageStore) -> list[dict]:
     before its onset (LIVE-04) and its detection latency (ANOM-07). Built from the alerts
     themselves, so it covers whatever the detectors found."""
     start = ds.start.date()
+    names = _ward_names(ds)
     out = []
     for e in timeline(ds, today):
-        if e.first > today:
+        if e.first > today or is_routine(e.type):
             continue
         cfg = ALERT_TYPES[e.type]
         out.append(
@@ -254,13 +289,14 @@ def replay_events(ds: Dataset, today: date, store: TriageStore) -> list[dict]:
                 "type_label": cfg["label"],
                 "severity": cfg["severity"],
                 "ward": e.ward,
+                "wards": e.wards(today),
                 "subject": e.subject,
                 "title": e.firings[0].title,
                 "onset": e.onset.isoformat(),
                 "first_seen": e.first.isoformat(),
                 "detection_days": (e.first - e.onset).days,
                 "replay_from": max(start, e.onset - timedelta(days=REPLAY_LEAD_DAYS)).isoformat(),
-                "triage": summarize(ds, e, today, store)["triage"]["status"],
+                "triage": summarize(ds, e, today, store, names)["triage"]["status"],
             }
         )
     return sorted(out, key=lambda x: x["first_seen"], reverse=True)
@@ -269,3 +305,19 @@ def replay_events(ds: Dataset, today: date, store: TriageStore) -> list[dict]:
 def warm(ds: Dataset, as_of: date) -> None:
     """Compute the timeline ahead of the first request (a few seconds on the full data)."""
     timeline(ds, as_of)
+
+
+def alerts_for_patient(ds: Dataset, as_of: date, store: TriageStore, patient_id: str) -> list[dict]:
+    """Active alerts this patient is part of: as a case, a sentinel or a known carrier."""
+    isolates = set(ds.isolates.isolate_id[ds.isolates.patient_id.eq(patient_id)])
+    by_id = {e.id: e for e in timeline(ds, as_of) if e.first <= as_of}
+    out = []
+    for a in alerts_at(ds, as_of, store):
+        e = by_id[a["id"]]
+        if (
+            e.subject == patient_id
+            or e.subject.endswith(f"|{patient_id}")
+            or any(i in isolates for f in e.up_to(as_of) for i in f.isolate_ids)
+        ):
+            out.append(a)
+    return out

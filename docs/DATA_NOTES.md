@@ -106,3 +106,16 @@ Our convention: first isolate is taken *within the analysed stratum and window* 
   sex effect survives, and only where urine E. coli is plentiful (URO, PHC-N).
 - Ingesting one day (~40 cultures) takes ~0.5–1 s including the alert re-run, and the incremental
   timeline equals a full rebuild exactly.
+
+## Learned while building patients, spread and therapy (slice 4)
+- Carriers (first positive per patient × phenotype): ESBL 491, MRSA 110, CPE 12, VRE 5. Their later samples on a
+  hospital ward the patient hadn't visited in 30 days: 1,336 in 3 years (ED 416, GER 230, MED-A 182, URO 147,
+  SURG 144, MED-B 124, ICU 93), ~8.5 a week. Health centres would add ~860 more.
+- Resistance profiles: ESBL E. coli has 4 core profiles (R: AMP CIP CRO CXM 40 %, AMP CRO CXM 33 %, +TZP variants);
+  MRSA 2 (FOX 76 %, CLI+FOX 24 %). The URO ESBL outbreak is one profile (26/29, R: AMP CIP CRO CXM TMP, 20 %
+  background); the ICU MRSA cluster is CLI+FOX (12/13, 9 % background). Planted strains are uniform; background
+  cases are not.
+- Wound S. aureus is tested only for FOX, VAN, CLI (plus TMP/NIT in urine); E. faecalis only for AMP, NIT, VAN.
+  Most organism × agent pairs relevant to empirical therapy are never tested, which caps WISCA coverage.
+- No multi-ward spread is planted: one profile turning up on several wards beyond its own baseline happens once in
+  3 years (3 ESBL K. pneumoniae, Apr 2025).

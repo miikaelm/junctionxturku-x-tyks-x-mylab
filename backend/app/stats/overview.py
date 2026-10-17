@@ -100,7 +100,7 @@ def add_markers(grid: dict, events: list[dict]) -> dict:
         col = next((i for i, (s, t) in enumerate(zip(starts, ends)) if s <= day <= t), None)
         if col is None:
             continue
-        for ward in (e["ward"], TOTAL):
+        for ward in (*e.get("wards", [e["ward"]]), TOTAL):
             if ward in by_ward:
                 by_ward[ward]["cells"][col].setdefault("alerts", []).append(e)
     return grid

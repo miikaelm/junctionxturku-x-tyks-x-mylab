@@ -51,7 +51,7 @@ export function AlertList({ alerts, showWard = true }: { alerts: AlertSummary[];
             <SeverityPill severity={a.severity} />
             <span className="alert-item-main">
               <strong>
-                {showWard && <span className="mono">{a.ward} · </span>}
+                {showWard && <span className="mono">{a.wards.join(", ")} · </span>}
                 {a.type_label}
               </strong>
               <span>{a.title}</span>
