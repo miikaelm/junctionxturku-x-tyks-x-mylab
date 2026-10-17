@@ -34,6 +34,8 @@ the validation answer key, the decisions log and open questions.
 - Frontend (needs Node.js): `cd frontend && npm install && npm run dev` (port 5173)
 
 ## Data
+- **[docs/DATA_NOTES.md](docs/DATA_NOTES.md)**: profiled facts (counts, tested pairs, volumes,
+  small-number reality). Read it instead of re-analysing the CSVs; update it if you learn something new.
 - `synthetic_microbiology_dataset/`: CSVs (UTF-8, comma, ISO dates) plus a README with the column docs.
 - Join chain: `patients` → `cultures` (patient_id) → `isolates` (culture_id) → `susceptibility` (isolate_id).
 - Period 2023-10-02 → 2026-09-27; the scenario's "today" is 2026-09-27.
