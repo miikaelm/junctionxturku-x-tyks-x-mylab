@@ -1,9 +1,25 @@
+import threading
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import config
+from app.alerts import engine
 from app.api.routes import router
+from app.data.dataset import get_dataset
 
-app = FastAPI(title="AEI – Antibiotic Efficacy Indicator")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Load the data and run the detectors in the background so the first page is fast.
+    threading.Thread(
+        target=lambda: engine.warm(get_dataset(), config.DEFAULT_AS_OF), daemon=True
+    ).start()
+    yield
+
+
+app = FastAPI(title="AEI – Antibiotic Efficacy Indicator", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],

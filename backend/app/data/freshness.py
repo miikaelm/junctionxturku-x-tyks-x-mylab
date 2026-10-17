@@ -9,7 +9,12 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from app.config import FRESHNESS_ALPHA, FRESHNESS_RATE_LOOKBACK_DAYS, FRESHNESS_WARN_ALPHA
+from app.config import (
+    FRESHNESS_ALPHA,
+    FRESHNESS_RATE_LOOKBACK_DAYS,
+    FRESHNESS_WARN_ALPHA,
+    GAP_VOLUME_WINDOW_DAYS,
+)
 from app.data.dataset import Dataset
 
 
@@ -48,3 +53,30 @@ def _entry(ward, last, silent_days, rate, p_silence, status) -> dict:
         "p_silence": p_silence,
         "status": status,
     }
+
+
+def feed_status(ds: Dataset, as_of: date) -> list[dict]:
+    """Freshness plus recent daily volume per ward, for the feed-status view (V7)."""
+    days = FRESHNESS_RATE_LOOKBACK_DAYS
+    first = as_of - timedelta(days=days - 1)
+    week_start = as_of - timedelta(days=GAP_VOLUME_WINDOW_DAYS - 1)
+    base_start = week_start - timedelta(days=FRESHNESS_RATE_LOOKBACK_DAYS)
+    cultures = ds.cultures[ds.cultures.sample_date <= pd.Timestamp(as_of)]
+    out = []
+    for entry in ward_freshness(ds, as_of):
+        dates = cultures.sample_date[cultures.ward_code == entry["ward_code"]]
+        per_day = dates[dates >= pd.Timestamp(first)].dt.date.value_counts()
+        daily = [int(per_day.get(first + timedelta(days=k), 0)) for k in range(days)]
+        base = dates.between(pd.Timestamp(base_start), pd.Timestamp(week_start - timedelta(days=1)))
+        base_days = (week_start - max(base_start, ds.start.date())).days
+        out.append(
+            {
+                **entry,
+                "daily": {"start": first.isoformat(), "counts": daily},
+                "last_week": int((dates >= pd.Timestamp(week_start)).sum()),
+                "expected_week": round(int(base.sum()) / base_days * GAP_VOLUME_WINDOW_DAYS, 1)
+                if base_days > 0
+                else None,
+            }
+        )
+    return out

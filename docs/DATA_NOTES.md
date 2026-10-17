@@ -81,3 +81,15 @@ Our convention: first isolate is taken *within the analysed stratum and window* 
 ## Known effects (built into the generator, not anomalies)
 - Urine E. coli CIP: men 12.6 % vs women 6.0 %.
 - Mixed growth rate differs by ward (ICU ~2 %, GER up to 11 %).
+
+## Learned while building the detectors (slice 2)
+- Daily volumes are **over-dispersed** vs Poisson: ordinary weeks dip to ~60 % of expected
+  (e.g. ED 39 vs 64 in a week, Poisson p ≈ 5e-4). Volume tests need a much stricter α than the
+  freshness badge (we alert at p < 1e-6).
+- Non-planted signals the general detectors find: MED-B ESBL mini-cluster Sep 2024 (3 cases,
+  all hospital-acquired, with an E. coli TZP jump to 9/29) and MED-A ESBL Apr 2025 (5 cases vs
+  0.7 expected). Treat them as plausible real signals, not bugs.
+- Phenotype repeats are rare: a patient has at most 2 MRSA isolates, so case de-duplication
+  barely changes cluster counts.
+- MRSA/ESBL "first on this ward in ≥ 180 days" happens ~12 times in 3 years (mostly MRSA on
+  small wards).

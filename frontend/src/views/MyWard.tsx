@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { api, type Specimen } from "../api/client";
+import { AlertStrip } from "../components/AlertStrip";
 import { Antibiogram } from "../components/Antibiogram";
 import { CellDetail } from "../components/CellDetail";
 import { FilterBar, type Filters } from "../components/FilterBar";
@@ -49,6 +50,8 @@ export function MyWard() {
         </div>
         <FreshnessBadge freshness={fresh.data} location={location} />
       </section>
+
+      <AlertStrip location={location} />
 
       <FilterBar
         location={location}

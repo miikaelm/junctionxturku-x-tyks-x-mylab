@@ -164,6 +164,22 @@ p {
   color: var(--text-2);
   font-weight: 550;
 }
+a.nav-item {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.nav-badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
 .nav-item.active {
   background: var(--accent-soft);
   color: var(--accent);
@@ -840,9 +856,12 @@ p {
     gap: 10px;
     padding: 10px 16px;
   }
-  .brand-sub,
-  .nav {
+  .brand-sub {
     display: none;
+  }
+  .nav {
+    order: 3;
+    width: 100%;
   }
   .cursor {
     margin-left: auto;
@@ -882,5 +901,326 @@ p {
   }
   .ab-abx-head {
     min-width: 88px;
+  }
+}
+
+/* ---------- Alerts, feed status (slice 2: plain styles; polish comes in slice 5) ---------- */
+.card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 16px;
+  transition: opacity 0.15s;
+}
+.card.pad {
+  padding: 16px;
+}
+.card h2,
+.section-title {
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+.is-loading {
+  opacity: 0.6;
+}
+.empty {
+  padding: 24px 16px;
+  color: var(--text-2);
+}
+.note {
+  max-width: 760px;
+}
+.back {
+  margin-bottom: 8px;
+}
+a {
+  color: var(--accent);
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  color: var(--text-2);
+}
+.nowrap {
+  white-space: nowrap;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.table.compact td,
+.table.compact th {
+  padding: 6px 8px;
+}
+.table tr.is-resolved td {
+  opacity: 0.6;
+}
+.table tr.is-hit td {
+  background: var(--bad-bg);
+}
+.table-foot {
+  padding: 8px 12px;
+}
+.row-link {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: var(--text);
+}
+.row-link span {
+  color: var(--text-2);
+}
+.row-link:hover strong {
+  color: var(--accent);
+}
+.hit {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.sev,
+.triage,
+.fresh-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sev-critical {
+  background: var(--bad);
+  color: #fff;
+}
+.sev-high {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.sev-medium {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.sev-low,
+.sev-info {
+  background: var(--none-bg);
+  color: var(--none);
+}
+.triage-new {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.triage-investigating {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.triage-confirmed {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+.triage-dismissed {
+  background: var(--none-bg);
+  color: var(--none);
+}
+.fresh-pill.fresh-ok {
+  background: var(--good-bg);
+  color: var(--good);
+}
+.fresh-pill.fresh-delayed {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.fresh-pill.fresh-stale,
+.fresh-pill.fresh-no_data {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+
+.alert-strip {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--bad);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.alert-strip-head {
+  margin-bottom: 6px;
+}
+.alert-strip-empty {
+  margin: -8px 0 12px;
+}
+.alert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.alert-item a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--text);
+}
+.alert-item a:hover {
+  background: var(--surface-2);
+}
+.alert-item.is-resolved {
+  opacity: 0.65;
+}
+.alert-item-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.alert-item-main span {
+  color: var(--text-2);
+}
+.alert-item-meta {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.alert-title {
+  font-size: 22px !important;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 16px;
+}
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+.facts dt {
+  color: var(--text-3);
+  font-weight: 600;
+}
+.facts dd {
+  margin: 0;
+}
+.method {
+  margin-top: 12px;
+}
+.triage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.field textarea {
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font: inherit;
+  color: inherit;
+  resize: vertical;
+}
+.btn {
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  font-weight: 550;
+}
+.btn:disabled {
+  opacity: 0.5;
+}
+.history {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.chart {
+  margin: 0;
+}
+.chart figcaption {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.chart svg {
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+}
+.chart-grid {
+  stroke: var(--line);
+}
+.chart-tick {
+  font-size: 11px;
+  fill: var(--text-3);
+}
+.chart-bar {
+  fill: var(--accent);
+}
+.chart-bar.is-thin {
+  fill: var(--none);
+  opacity: 0.5;
+}
+.chart-ci {
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+.chart-expected {
+  stroke: var(--bad);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.chart-note {
+  margin-top: 4px;
+}
+.spark {
+  display: block;
+}
+.spark-bar {
+  fill: var(--accent);
+}
+.spark-zero {
+  fill: var(--bad);
+}
+
+@media (max-width: 860px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .alert-item a {
+    flex-wrap: wrap;
   }
 }

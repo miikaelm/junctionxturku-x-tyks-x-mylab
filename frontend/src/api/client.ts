@@ -24,6 +24,9 @@ export interface Meta {
   specimens: Specimen[];
   organisms: string[];
   age_bands: string[];
+  alert_types: { key: AlertType; label: string; severity: Severity }[];
+  severities: Severity[];
+  triage_statuses: TriageStatus[];
   thresholds: { min_isolates: number; good_below: number; warn_below: number; ci_level: number };
 }
 
@@ -98,6 +101,119 @@ export interface Freshness {
   wards: WardFreshness[];
 }
 
+export interface FeedWard extends WardFreshness {
+  daily: { start: string; counts: number[] };
+  last_week: number;
+  expected_week: number | null;
+}
+
+export interface Feed {
+  as_of: string;
+  wards: FeedWard[];
+}
+
+// ---------- Alerts (slice 2) ----------
+
+export type AlertType = "sentinel" | "cluster" | "rate_shift" | "novelty" | "data_gap";
+export type Severity = "critical" | "high" | "medium" | "low" | "info";
+export type TriageStatus = "new" | "investigating" | "confirmed" | "dismissed";
+
+/** Why an alert fired (ANOM-06). Fields depend on the alert type. */
+export interface Evidence {
+  method: string;
+  p_value?: number;
+  q_value?: number;
+  observed?: number | Estimate;
+  expected?: number | Estimate;
+  window?: { start: string; end: string };
+  baseline?: { start: string; end: string; cases?: number; days?: number };
+  [key: string]: unknown;
+}
+
+export interface AlertSummary {
+  id: string;
+  type: AlertType;
+  type_label: string;
+  severity: Severity;
+  ward: string;
+  ward_en: string;
+  subject: string;
+  title: string;
+  first_seen: string;
+  last_seen: string;
+  firings: number;
+  state: "active" | "resolved";
+  resolved_on: string | null;
+  triage: { status: TriageStatus; note: string; as_of: string | null; suppressed_by: string | null };
+  evidence: Evidence;
+}
+
+export interface AlertCounts {
+  active: number;
+  new: number;
+  by_severity: Partial<Record<Severity, number>>;
+}
+
+export interface AlertList {
+  as_of: string;
+  counts: AlertCounts;
+  alerts: AlertSummary[];
+}
+
+export interface CaseRow {
+  isolate_id: string;
+  date: string;
+  patient_id: string;
+  sex: "F" | "M";
+  age: number;
+  ward: string;
+  specimen: Specimen;
+  organism: string;
+  phenotypes: string[];
+  days_since_admission: number | null;
+  hospital_acquired: boolean;
+  resistant: string[];
+  tested: number;
+  highlight: boolean | null;
+}
+
+export interface TimelinePoint extends Partial<Estimate> {
+  start: string;
+  end: string;
+  value?: number;
+}
+
+export interface AlertTimeline {
+  kind: "counts" | "rate";
+  label: string;
+  unit: "day" | "week" | "4 weeks";
+  expected: number | null;
+  points: TimelinePoint[];
+}
+
+export interface TriageEntry {
+  status: TriageStatus;
+  as_of: string;
+  note: string;
+  at: string;
+}
+
+export interface AlertDetail extends AlertSummary {
+  as_of: string;
+  trigger: { day: string; title: string; evidence: Evidence };
+  history: { day: string; title: string; p_value?: number; q_value?: number }[];
+  cases: CaseRow[];
+  timeline: AlertTimeline;
+  triage_history: TriageEntry[];
+}
+
+export interface AlertQuery {
+  location?: string;
+  type?: AlertType;
+  include_resolved?: boolean;
+  as_of: string;
+}
+
 export interface AntibiogramQuery {
   location: string;
   specimen: Specimen;
@@ -117,6 +233,16 @@ async function get<T>(path: string, params: Params = {}, signal?: AbortSignal): 
   return res.json() as Promise<T>;
 }
 
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`/api${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json() as Promise<T>;
+}
+
 export const api = {
   health: () => get<Health>("/health"),
   meta: () => get<Meta>("/meta"),
@@ -124,4 +250,10 @@ export const api = {
     get<Antibiogram>("/antibiogram", { ...q }, signal),
   freshness: (as_of: string, signal?: AbortSignal) =>
     get<Freshness>("/freshness", { as_of }, signal),
+  feed: (as_of: string, signal?: AbortSignal) => get<Feed>("/feed", { as_of }, signal),
+  alerts: (q: AlertQuery, signal?: AbortSignal) => get<AlertList>("/alerts", { ...q }, signal),
+  alert: (id: string, as_of: string, signal?: AbortSignal) =>
+    get<AlertDetail>(`/alerts/${encodeURIComponent(id)}`, { as_of }, signal),
+  triage: (id: string, status: TriageStatus, as_of: string, note = "") =>
+    post<TriageEntry>(`/alerts/${encodeURIComponent(id)}/triage`, { status, note, as_of }),
 };

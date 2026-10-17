@@ -1,6 +1,20 @@
+import { href, type Route } from "../lib/route";
+import { useApp } from "../state/AppContext";
 import { TimeCursor } from "./TimeCursor";
 
-export function Header() {
+export function Header({ route }: { route: Route }) {
+  const { alertCounts } = useApp();
+  const view = route.view === "alert" ? "alerts" : route.view;
+  const item = (key: Route["view"], label: string, badge?: number) => (
+    <a href={href({ view: key } as Route)} className={`nav-item ${view === key ? "active" : ""}`}>
+      {label}
+      {badge ? (
+        <span className="nav-badge" title={`${badge} new active alert${badge > 1 ? "s" : ""}`}>
+          {badge}
+        </span>
+      ) : null}
+    </a>
+  );
   return (
     <header className="topbar">
       <div className="brand">
@@ -20,7 +34,9 @@ export function Header() {
         <span className="brand-sub">Antibiotic Efficacy Indicator</span>
       </div>
       <nav className="nav">
-        <span className="nav-item active">My Ward</span>
+        {item("ward", "My Ward")}
+        {item("alerts", "Alerts", alertCounts?.new)}
+        {item("feed", "Feed status")}
       </nav>
       <TimeCursor />
     </header>

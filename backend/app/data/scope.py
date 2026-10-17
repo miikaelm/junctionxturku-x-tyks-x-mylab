@@ -69,6 +69,15 @@ class Scope:
             mask &= df.hospital_acquired.eq(self.hospital_acquired)
         return df[mask]
 
+    def ward_codes(self, wards: pd.DataFrame) -> set[str]:
+        """The wards this location covers."""
+        level = self.level(wards)
+        if level == "all":
+            return set(wards.ward_code)
+        if level == "institution":
+            return set(wards.ward_code[wards.institution.eq(self.location)])
+        return {self.location}
+
     def to_dict(self, wards: pd.DataFrame) -> dict:
         return {
             "location": self.location,
