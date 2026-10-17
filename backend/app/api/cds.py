@@ -173,6 +173,15 @@ def _age_band(age) -> str | None:
     return None
 
 
+def _groups_text(groups: list[dict], lead: str) -> str:
+    """Subgroup exceptions (UX-10) as card lines."""
+    return "".join(
+        f"\n\n{lead} {g['label'].lower()}: {g['organism']} {g['pct']:g} % resistant "
+        f"({g['r']}/{g['n']}), against {g['rest']['pct']:g} % in {g['rest_label'].lower()}."
+        for g in groups
+    )
+
+
 def order_select(context: dict, as_of: date) -> list[dict]:
     ds = get_dataset()
     pid = context.get("patientId")
@@ -213,6 +222,7 @@ def order_select(context: dict, as_of: date) -> list[dict]:
     flagged = {x["code"]: x for x in flags["avoid"]}
     unsuited = {x["code"]: x for x in flags["not_suited"]}
     risen = {x["code"]: x for x in flags["recent_rise"]}
+    some = {x["code"]: x for x in flags["some_patients"]}
     items = {x["code"]: x for x in result["ranked"] + result["unranked"]}
     names = ds.antibiotics.set_index("antibiotic_code").antibiotic
 
@@ -233,6 +243,7 @@ def order_select(context: dict, as_of: date) -> list[dict]:
                     f"{o['direction'] or '–'} |"
                     for o in above
                 )
+                + _groups_text(x["subgroups"], "Under the limit for")
                 + f"\n\n{flags['method']} Decision support, not a prescription.",
                 [link("Open My Ward in AEI", "ward")],
             )
@@ -272,6 +283,21 @@ def order_select(context: dict, as_of: date) -> list[dict]:
                 f"{x['name'].capitalize()} does not act on most {label} organisms",
                 "warning",
                 f"Intrinsically resistant: {', '.join(intrinsic)}.",
+            )
+        )
+    elif chosen in some:
+        x = some[chosen]
+        groups = ", ".join(g["label"].lower() for g in x["subgroups"])
+        cards.append(
+            card(
+                f"{x['name'].capitalize()} on {ward}: no warning overall, but high in {groups}",
+                "warning",
+                f"Over all {label}s here no main organism is {flags['threshold_pct']:g} % or more "
+                "resistant, but for some patients it is."
+                + _groups_text(x["subgroups"], "Over the limit for")
+                + "\n\nPass the patient's sex, age and onset (or a patientId) to check their group. "
+                "Decision support, not a prescription.",
+                [link("Open My Ward in AEI", "ward")],
             )
         )
     elif chosen and chosen in items:

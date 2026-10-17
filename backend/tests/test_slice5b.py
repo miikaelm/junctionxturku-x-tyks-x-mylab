@@ -127,3 +127,49 @@ def test_stewardship_endpoints(client):
     tmp = next(a for a in avoid_uro["avoid"] if a["code"] == "TMP")
     assert any(o.get("finding", {}).get("status") == "guideline_updated" for o in tmp["organisms"])
     assert all(r["rise"]["cause"] for r in avoid_uro["recent_rise"])
+
+
+# ---------- Subgroup exceptions (UX-10) ----------
+
+TODAY = date(2026, 9, 27)
+
+
+def test_subgroup_exceptions_only_when_they_change_the_answer():
+    from app.config import SUBGROUP_MIN_N
+
+    ds = get_dataset()
+    for ward in ("URO", "MED-A", "MED-B", "ED"):
+        r = avoid(ds, Scope(ward), "uti", TODAY)
+        for key, overall in (("avoid", "above"), ("some_patients", "below")):
+            for a in r[key]:
+                for g in a["subgroups"]:
+                    # On the other side of the limit from the whole, with enough data on both sides.
+                    assert g["side"] != overall and g["n"] >= SUBGROUP_MIN_N
+                    assert g["rest"]["n"] >= SUBGROUP_MIN_N and g["q_value"] < 0.05
+                    assert (g["pct"] >= EMPIRICAL_THRESHOLD_PCT) == (g["side"] == "above")
+        assert all(a["subgroups"] for a in r["some_patients"])
+        assert not any(a["subgroups"] for a in r["no_warning"])
+    # Urine E. coli: ciprofloxacin is fine overall on URO but not for men.
+    uro = avoid(ds, Scope("URO"), "uti", TODAY)
+    cip = next(a for a in uro["some_patients"] if a["code"] == "CIP")
+    men = next(g for g in cip["subgroups"] if g["dimension"] == "sex")
+    assert men["label"] == "Men" and men["pct"] > 2 * men["rest"]["pct"]
+    # A filtered dimension is not split again.
+    only_men = avoid(ds, Scope("URO", sex="M"), "uti", TODAY)
+    groups = [g for k in ("avoid", "some_patients") for a in only_men[k] for g in a["subgroups"]]
+    assert all(g["dimension"] != "sex" for g in groups)
+
+
+def test_order_check_uses_the_patients_group(client):
+    def first(ctx):
+        return client.post(
+            "/api/cds-services/aei-antibiotic-choice",
+            params={"as_of": TODAY.isoformat()},
+            json={"hook": "order-select", "context": ctx},
+        ).json()["cards"][0]
+
+    base = {"ward": "URO", "infection": "uti", "antibiotic": "CIP"}
+    unknown = first(base)
+    assert unknown["indicator"] == "warning" and "high in men" in unknown["summary"]
+    assert first({**base, "sex": "F", "age": 40})["indicator"] == "info"
+    assert first({**base, "sex": "M", "age": 70})["summary"].startswith("Avoid ciprofloxacin")

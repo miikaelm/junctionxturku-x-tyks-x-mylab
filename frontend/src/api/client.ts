@@ -870,6 +870,21 @@ export interface AvoidAgent {
   since?: string;
   since_at_least?: boolean;
   recent_rise?: RecentRise | null;
+  /** Patient groups on the other side of the limit from the whole (UX-10). */
+  subgroups?: SubgroupException[];
+}
+
+export interface SubgroupException extends Estimate {
+  organism: string;
+  dimension: "sex" | "age_band" | "hospital_acquired";
+  dimension_label: string;
+  value: string | boolean;
+  label: string;
+  rest_label: string;
+  side: "above" | "below";
+  rest: Estimate;
+  level_label: string;
+  q_value: number;
 }
 
 export interface Avoid {
@@ -884,6 +899,7 @@ export interface Avoid {
   threshold_pct: number;
   avoid: AvoidAgent[];
   recent_rise: (AvoidAgent & { rise: RecentRise })[];
+  some_patients: AvoidAgent[];
   no_warning: AvoidAgent[];
   not_suited: AvoidAgent[];
   unknown: AvoidAgent[];

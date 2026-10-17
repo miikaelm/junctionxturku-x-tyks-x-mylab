@@ -139,3 +139,7 @@ Our convention: first isolate is taken *within the analysed stratum and window* 
   trends: the outbreak quarter pulls the line up. They show as "rising" findings; read them with the outbreak in mind.
 - The URO resistance shift and the ESBL cluster are the same patients: every ceftriaxone-resistant E. coli first
   isolate on URO in the 4 weeks to 27 Jun 2025 belongs to a cluster case.
+- Subgroup exceptions on the avoid lists (UX-10) at 2026-09-27 are few: urine E. coli ciprofloxacin is ≥ 20 % in
+  men only (URO 24 % (23/98) vs 3 % in women; MED-B 24 % vs 6 %), and bloodstream S. aureus clindamycin
+  (hospital-wide figures) is 26 % (9/34) in 18–64-year-olds vs 2 % at other ages. None at 2025-06-27.
+- Children are not rare: 1,271 isolates from 0–17-year-olds (5 % of all).

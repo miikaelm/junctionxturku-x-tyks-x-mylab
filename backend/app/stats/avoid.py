@@ -11,11 +11,19 @@ date: the start of the unbroken run above the limit) and the direction (last 12 
 12 months before). Intrinsic resistance is noted, never flagged (it is not local news), and
 agents never tested on a main organism say so. Agents that most of the infection's organisms
 resist intrinsically (vancomycin for a UTI) are listed as not suited rather than "no warning".
+
+Subgroup exceptions (UX-10): a patient group (sex, age band, onset) whose resistance lands on the
+other side of the limit from the whole is named, but only when it changes the answer and the
+difference holds up: the group against the rest of the patients, Fisher exact, at least
+SUBGROUP_MIN_DIFF_PP apart, n ≥ SUBGROUP_MIN_N on both sides, Benjamini–Hochberg across every
+comparison with enough data on the list. A flagged agent can be under the limit for a group; an
+agent without a warning can be over it for a group ("some_patients").
 """
 
 from dataclasses import replace
 from datetime import date, timedelta
 
+import numpy as np
 import pandas as pd
 from scipy.stats import fisher_exact
 
@@ -27,8 +35,12 @@ from app.config import (
     AVOID_NOT_SUITED_SHARE,
     AVOID_SINCE_MAX_STEPS,
     AVOID_SINCE_STEP_DAYS,
+    AVOID_SUBGROUP_DIMENSIONS,
     EMPIRICAL_THRESHOLD_PCT,
     MIN_ISOLATES_FOR_PERCENT,
+    SUBGROUP_DIMENSIONS,
+    SUBGROUP_MIN_DIFF_PP,
+    SUBGROUP_MIN_N,
     THERAPY_EXCLUDE,
     THERAPY_INFECTIONS,
     THERAPY_RESERVE,
@@ -38,8 +50,10 @@ from app.data.dataset import Dataset
 from app.data.first_isolate import first_isolates
 from app.data.intrinsic import is_intrinsic
 from app.data.scope import Scope
+from app.detectors.common import bh_qvalues, significant
 from app.stats.antibiogram import reported_antibiotics
 from app.stats.proportions import estimate
+from app.stats.subgroups import value_label
 
 _memo: dict[tuple, tuple[Dataset, dict]] = {}
 
@@ -112,6 +126,9 @@ def _avoid(ds: Dataset, scope: Scope, infection: str, as_of: date) -> dict:
             unknown.append(item)
 
     flagged.sort(key=lambda x: (-x["affected_share"], -x["worst_pct"]))
+    _subgroup_exceptions(ds, scope, chain, firsts, flagged, clear)
+    some = [x for x in clear if x["subgroups"]]
+    clear = [x for x in clear if not x["subgroups"]]
     return {
         "as_of": as_of.isoformat(),
         "infection": infection,
@@ -128,6 +145,7 @@ def _avoid(ds: Dataset, scope: Scope, infection: str, as_of: date) -> dict:
         "main_organisms": [{"organism": o, "share": round(float(shares[o]), 3)} for o in main],
         "threshold_pct": EMPIRICAL_THRESHOLD_PCT,
         "avoid": flagged,
+        "some_patients": some,
         "no_warning": clear,
         "not_suited": not_suited,
         "unknown": unknown,
@@ -137,6 +155,77 @@ def _avoid(ds: Dataset, scope: Scope, infection: str, as_of: date) -> dict:
             f"n ≥ {MIN_ISOLATES_FOR_PERCENT}, using a broader location when there are too few here."
         ),
     }
+
+
+def _subgroup_exceptions(ds, scope, chain, firsts, flagged, clear) -> None:
+    """Attach `subgroups` to each agent: patient groups that land on the other side of the limit
+    (UX-10). Each organism is compared at the level its own figure came from."""
+    dims = [d for d in AVOID_SUBGROUP_DIMENSIONS if getattr(scope, d) is None]
+    locations = [c.location for c in chain]
+    merged: dict[int, pd.DataFrame] = {}
+    candidates, compared = [], 0
+    for item in flagged + clear:
+        item["subgroups"] = []
+        above = [o for o in item["organisms"] if o["status"] == "above"]
+        for o in item["organisms"]:
+            # A flagged agent's answer only changes for a group if this is its only reason.
+            if o["status"] not in ("above", "below") or (o["status"] == "above" and len(above) > 1):
+                continue
+            if o["status"] == "below" and above:
+                continue
+            i = locations.index(o["location"])
+            if i not in merged:
+                f = firsts[i][["isolate_id", "organism", *dims]]
+                merged[i] = f.merge(ds.ast[["isolate_id", "antibiotic_code", "resistant"]])
+            rows = merged[i][
+                merged[i].organism.eq(o["organism"]) & merged[i].antibiotic_code.eq(item["code"])
+            ]
+            total_n, total_r = len(rows), int(rows.resistant.sum())
+            for dim in dims:
+                for value, g in rows.groupby(dim).resistant.agg(n="size", r="sum").iterrows():
+                    n, r = int(g.n), int(g.r)
+                    rest_n, rest_r = total_n - n, total_r - r
+                    if n < SUBGROUP_MIN_N or rest_n < SUBGROUP_MIN_N:
+                        continue
+                    compared += 1
+                    pct, rest_pct = 100 * r / n, 100 * rest_r / rest_n
+                    crosses = (pct >= EMPIRICAL_THRESHOLD_PCT) != (o["status"] == "above")
+                    if not crosses or abs(pct - rest_pct) < SUBGROUP_MIN_DIFF_PP:
+                        continue
+                    table = [[r, n - r], [rest_r, rest_n - rest_r]]
+                    candidates.append(
+                        (item, o, dim, value, (r, n), (rest_r, rest_n), fisher_exact(table)[1])
+                    )
+    if not candidates:
+        return
+    q = bh_qvalues(np.array([c[-1] for c in candidates]), m=compared)
+    for (item, o, dim, value, (r, n), (rest_r, rest_n), _), qv in zip(candidates, q):
+        if not significant(np.array([qv]))[0]:
+            continue
+        value = value.item() if hasattr(value, "item") else value
+        item["subgroups"].append(
+            {
+                "organism": o["organism"],
+                "dimension": dim,
+                "dimension_label": SUBGROUP_DIMENSIONS[dim],
+                "value": value,
+                "label": value_label(dim, value),
+                "rest_label": _rest_label(dim, value),
+                "side": "above" if 100 * r / n >= EMPIRICAL_THRESHOLD_PCT else "below",
+                **estimate(r, n),
+                "rest": estimate(rest_r, rest_n),
+                "level_label": o["level_label"],
+                "q_value": float(qv),
+            }
+        )
+
+
+def _rest_label(dim: str, value) -> str:
+    if dim == "sex":
+        return value_label(dim, "M" if value == "F" else "F")
+    if dim == "hospital_acquired":
+        return value_label(dim, not value)
+    return "other ages"
 
 
 def _counts(ds: Dataset, firsts: pd.DataFrame) -> pd.DataFrame:
@@ -225,7 +314,9 @@ def with_recent_rises(result: dict, rises: list[dict]) -> dict:
     already flagged gets the rise attached; any other agent moves to `recent_rise`."""
     by_code = {r["code"]: r for r in rises}
     names = {
-        x["code"]: x for k in ("avoid", "no_warning", "not_suited", "unknown") for x in result[k]
+        x["code"]: x
+        for k in ("avoid", "some_patients", "no_warning", "not_suited", "unknown")
+        for x in result[k]
     }
     out = {**result, "recent_rise": []}
     out["avoid"] = [{**x, "recent_rise": by_code.get(x["code"])} for x in result["avoid"]]
@@ -236,4 +327,5 @@ def with_recent_rises(result: dict, rises: list[dict]) -> dict:
         out["recent_rise"].append({**names[code], "rise": rise})
     moved = {x["code"] for x in out["recent_rise"]}
     out["no_warning"] = [x for x in result["no_warning"] if x["code"] not in moved]
+    out["some_patients"] = [x for x in result["some_patients"] if x["code"] not in moved]
     return out

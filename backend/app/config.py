@@ -336,3 +336,8 @@ STEWARDSHIP_KINDS = {
     "rising": "Rising, still under the limit",
     "standing": "Above the limit as far back as the data goes",
 }
+# Subgroup exceptions on the avoid list (UX-10): patient groups whose resistance lands on the
+# other side of the empirical-use limit from the whole, tested against the rest of the patients
+# (Fisher exact, at least SUBGROUP_MIN_DIFF_PP apart, n ≥ SUBGROUP_MIN_N on both sides, FDR across
+# every comparison on the list). Shown only when the group changes the answer.
+AVOID_SUBGROUP_DIMENSIONS = ("sex", "age_band", "hospital_acquired")

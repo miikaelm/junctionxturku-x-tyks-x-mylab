@@ -279,6 +279,14 @@ This phase reworks *how* the data is presented, per role. Decide the approach be
   ("Urology ▾") and changes the address (`#/ward/MED-A`, back button works); "My ward" badge on one's own
   ward, "Viewing … · back to my ward" on another. The filter bar keeps only what narrows the patient group
   (sex, age, onset, infection).
+- [x] **UX-10 (S)** **Subgroup exceptions on the avoid list:** a patient group (sex, age band,
+  hospital-acquired / community onset) is named only when it changes the answer: an agent without a
+  warning is ≥ 20 % for a group ("Some patients": "Ciprofloxacin, for men: E. coli 24 % (23/98), against
+  3 % in women"), or a flagged agent is under 20 % for a group ("Except …"). The group is tested against
+  the rest of the patients (Fisher exact, ≥ 5 points apart, n ≥ 30 on both sides, FDR across the list),
+  at the level the figure comes from. No line means splitting changes nothing. A filtered dimension is
+  not split again; the order-select hook already uses the patient's own group, and when it is not
+  given, it warns that the agent is high for some groups.
 
 ---
 
@@ -450,6 +458,7 @@ E. faecalis (~10 %) is never tested for most agents and counts as not covered.
 | 2026-10-17 | **Stewardship findings (ANOM-10), as built:** a finding is a location × specimen × organism × antibiotic on some ward's avoid list (the location is the level the figure comes from, so wards that fall back share one finding), or a significant upward ANOM-03 trend still under 20 %. Kinds: crossed (the run above 20 % began inside the data), standing (as far back as 12-month figures go), rising. Review statuses new / under review / guideline updated / accepted, stored like triage with their as-of date; a status set more than one monthly step before the current run began does not carry over (a re-crossing is new again). Only lab / stewardship can set them; everyone can open a finding. The lab's "Trends" page becomes "Stewardship": findings first, then the trend tests and the explorer. |
 | 2026-10-17 | **UX-07 likely cause:** a rise names an active, non-dismissed cluster or multi-ward alert on the same ward when ≥ 50 % (and ≥ 3) of the patients behind its resistant first isolates are that outbreak's cases (`RISE_CAUSE_*` in config). Patients, not isolates, are matched, since the two detectors may pick different isolates of the same patient. |
 | 2026-10-17 | **UX-08/09 as built:** "What to avoid" shows each infection as a section, own samples before borrowed ones; the infection control (All · Urinary · Bloodstream · Wound) replaces the specimen control, and the detail tables get their own specimen choice when "All" is on. The ward is a native select laid over the page title; the address carries it (`#/ward/MED-A`). |
+| 2026-10-17 | **UX-10 subgroups on the avoid list:** not split by default (n shrinks fast: URO has ~340 urine E. coli a year; sex × age bands leave many groups under 30 and send them to broader, less local figures, and many splits make chance findings). Instead each list tests its agents × main organisms × patient groups (group vs rest) and shows only groups that land on the other side of 20 % with an FDR-controlled difference. Order on the list: new, long-standing, some patients. |
 | 2026-10-17 | **UX-06 notifications demoted:** alerts are first-party (inbox, overview, detail); notifications are delivery (email / Teams / webhook) and live under settings. Clinicians lose the badge and the alert strip; their ward's alerts appear inside the exceptions list. Infection-control nav becomes Overview (home) · Alerts · Spread · Carriers · ⚙. |
 
 ## 10. To-do & open questions
@@ -528,5 +537,5 @@ Work is split into vertical slices, one commit series each. Update the status he
 | 3 | Replay, trends, discovery | LIVE-02/04 · ANOM-03, 07 · V6 trends, V5 heatmap · STAT-07 defaults, STAT-09 · DATA-05 incremental | done |
 | 4 | Patients + integration | PAT-01–03 · API-02–05 · NOTIF-03/05 · V2 therapy helper · V10 spread · V11 mock EHR · ANOM-05/09 · VIEW-08 roles (moved up from slice 5) | done |
 | 5 | Usability optimization | UX-02–06 (exceptions-first overview, Varha drill-down, clinician "avoid" view, notifications to settings, visual polish; UX-01 design decided) · role landing pages · VIEW-09 | done (UX-04 partly: older views keep plain styling) |
-| 5b | Review fixes | UX-07–09 (avoid list groups and links, all infections, ward switcher) · ANOM-10 stewardship findings · orientation and demo bar | done |
+| 5b | Review fixes | UX-07–10 (avoid list groups and links, all infections, ward switcher, subgroup exceptions) · ANOM-10 stewardship findings · orientation and demo bar | done |
 | 6 | AI, extension data, delivery | AI-01–04 · EXT-* · README, demo presets · polish of the older views (rest of UX-04) · spread redesign (§10) | next |

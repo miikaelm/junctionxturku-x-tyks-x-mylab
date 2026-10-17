@@ -1,4 +1,4 @@
-import type { Avoid, AvoidAgent, AvoidOrganism, RecentRise } from "../api/client";
+import type { Avoid, AvoidAgent, AvoidOrganism, RecentRise, SubgroupException } from "../api/client";
 import { fmtDate, shortOrganism } from "../lib/format";
 import { href } from "../lib/route";
 
@@ -12,13 +12,14 @@ export function monthYear(iso: string): string {
 /**
  * What not to use for one infection (UX-05, UX-07), in two groups that say why: new first (a rise
  * in the last 4 weeks, with the alert that measured it and the outbreak it most likely comes from),
- * then long-standing (12-month figures, with since when, direction and the stewardship review).
+ * then long-standing (12-month figures, with since when, direction and the stewardship review),
+ * then agents with no warning overall that are over the limit for some patients (UX-10).
  * Agents without a warning are named on one line, so a doctor can check the one they have in mind.
  */
 export function AvoidList({ data, full = true }: { data: Avoid; full?: boolean }) {
   const label = data.infection_label.toLowerCase();
   const names = (xs: AvoidAgent[]) => xs.map((x) => x.name).join(", ");
-  const none = data.avoid.length === 0 && data.recent_rise.length === 0;
+  const none = data.avoid.length === 0 && data.recent_rise.length === 0 && data.some_patients.length === 0;
 
   return (
     <div className="avoid">
@@ -44,6 +45,29 @@ export function AvoidList({ data, full = true }: { data: Avoid; full?: boolean }
           <ul className="avoid-list">
             {data.avoid.map((a) => (
               <AvoidItem key={a.code} agent={a} />
+            ))}
+          </ul>
+        </div>
+      )}
+      {data.some_patients.length > 0 && (
+        <div className="avoid-group">
+          <p className="avoid-group-label">
+            <span className="tag tag-some">Some patients</span> no warning overall, but ≥ {data.threshold_pct} % for these
+            groups
+          </p>
+          <ul className="avoid-list">
+            {data.some_patients.map((a) => (
+              <li key={a.code} className="avoid-item is-some">
+                <div className="avoid-head">
+                  <strong className="avoid-name">{a.name}</strong>
+                  <span className="avoid-since">for {a.subgroups!.map((g) => g.label.toLowerCase()).join(", ")}</span>
+                </div>
+                {a.subgroups!.map((g) => (
+                  <p key={g.dimension + String(g.value)} className="avoid-why">
+                    <GroupLine g={g} />
+                  </p>
+                ))}
+              </li>
             ))}
           </ul>
         </div>
@@ -99,6 +123,11 @@ function AvoidItem({ agent }: { agent: AvoidAgent }) {
           </span>
         ))}
       </p>
+      {agent.subgroups?.map((g) => (
+        <p key={g.dimension + String(g.value)} className="avoid-also">
+          <span className="tag tag-except">Except</span> <GroupLine g={g} />
+        </p>
+      ))}
       {agent.recent_rise && (
         <p className="avoid-also">
           <span className="tag tag-rise">Also new</span> {Math.round(agent.recent_rise.observed.pct!)} % (
@@ -159,6 +188,22 @@ function RiseLinks({ rise }: { rise: RecentRise }) {
           </span>
         </span>
       )}
+    </span>
+  );
+}
+
+/** "Men: E. coli 24 % (23/98), against 3 % in women": a group against the rest of the patients. */
+function GroupLine({ g }: { g: SubgroupException }) {
+  return (
+    <span
+      title={`Group vs the rest of the patients, Fisher exact, false-discovery corrected q ${g.q_value.toFixed(3)}${g.level_label ? ` · ${g.level_label}` : ""}`}
+    >
+      <strong>{g.label}</strong>: {shortOrganism(g.organism)} <strong className="mono">{Math.round(g.pct!)} %</strong>{" "}
+      <span className="muted mono small">
+        ({g.r}/{g.n})
+      </span>
+      , against {Math.round(g.rest.pct!)} % in {g.rest_label.toLowerCase()}
+      {g.side === "below" ? ": under the limit" : ""}
     </span>
   );
 }

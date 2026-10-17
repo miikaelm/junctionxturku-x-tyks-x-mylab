@@ -2876,3 +2876,22 @@ a.brand {
     grid-column: 1;
   }
 }
+
+/* Subgroup exceptions (UX-10) */
+.tag-some {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border: 1px dashed currentColor;
+}
+.tag-except {
+  background: var(--surface);
+  color: var(--text-2);
+  border: 1px solid var(--line-strong);
+}
+.avoid-item.is-some {
+  background: var(--surface-2);
+  border-left: 4px solid var(--warn);
+}
+.avoid-item.is-some .avoid-name {
+  color: var(--text);
+}
