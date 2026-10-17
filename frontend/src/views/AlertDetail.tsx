@@ -19,9 +19,6 @@ export function AlertDetailView({ id }: { id: string }) {
 
   return (
     <>
-      <p className="back">
-        <a href={href({ view: "alerts" })}>← All alerts</a>
-      </p>
       {error && (
         <p className="error">
           {error.startsWith("404")

@@ -169,9 +169,6 @@ export function PatientView({ id }: { id: string }) {
 
   return (
     <>
-      <p className="back">
-        <a href={href({ view: "patients" })}>← Known carriers</a>
-      </p>
       {error && <p className="error">{error.startsWith("404") ? `No samples for ${id} up to ${fmtDate(asOf)}.` : error}</p>}
       {data && (
         <>

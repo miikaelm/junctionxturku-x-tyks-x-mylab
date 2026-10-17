@@ -1,5 +1,5 @@
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   api,
   type Anomalies,
@@ -40,16 +40,64 @@ export function Area({ id }: { id?: string }) {
   const key = ward?.ward_code ?? inst?.key ?? "varha";
 
   return (
+    <AreaLevels
+      data={data}
+      level={level}
+      levelKey={key}
+      inst={inst ?? (parent?.kind === "hospital" ? parent : undefined)}
+      parent={parent}
+      ward={ward}
+      loading={loading}
+    />
+  );
+}
+
+const DEPTH = { varha: 0, institution: 1, ward: 2 } as const;
+type Level = keyof typeof DEPTH;
+
+/** Going deeper zooms in, going up zooms out, so the change of level is felt, not just read. */
+const zoom = {
+  enter: (dir: number) => ({ opacity: 0, scale: dir > 0 ? 0.97 : 1.03, y: dir > 0 ? 14 : -14 }),
+  center: { opacity: 1, scale: 1, y: 0 },
+  exit: (dir: number) => ({ opacity: 0, scale: dir > 0 ? 1.02 : 0.98 }),
+};
+
+function AreaLevels({
+  data,
+  level,
+  levelKey,
+  inst,
+  parent,
+  ward,
+  loading,
+}: {
+  data: Anomalies;
+  level: Level;
+  levelKey: string;
+  inst?: InstitutionAnomalies;
+  parent?: InstitutionAnomalies;
+  ward?: WardAnomalies;
+  loading: boolean;
+}) {
+  const shown = useRef(DEPTH[level]);
+  const dir = Math.sign(DEPTH[level] - shown.current) || 1;
+  useEffect(() => {
+    shown.current = DEPTH[level];
+  }, [level]);
+
+  return (
     <LayoutGroup>
-      <div className={`area ${loading ? "is-loading" : ""}`}>
-        <Crumbs data={data} inst={inst ?? (parent?.kind === "hospital" ? parent : undefined)} ward={ward} />
-        <AnimatePresence mode="popLayout" initial={false}>
+      <div className={`area area-${level} ${loading ? "is-loading" : ""}`}>
+        <LevelStepper data={data} level={level} inst={inst} parent={parent} ward={ward} />
+        <AnimatePresence mode="popLayout" initial={false} custom={dir}>
           <motion.div
-            key={key}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease }}
+            key={levelKey}
+            custom={dir}
+            variants={zoom}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.3, ease }}
           >
             {level === "varha" && <VarhaLevel data={data} />}
             {level === "institution" && inst && <InstitutionLevel data={data} inst={inst} />}
@@ -62,20 +110,67 @@ export function Area({ id }: { id?: string }) {
   );
 }
 
-function Crumbs({ data, inst, ward }: { data: Anomalies; inst?: InstitutionAnomalies; ward?: WardAnomalies }) {
-  const items = [
-    { label: data.varha.label, to: href({ view: "area" }) },
-    ...(inst ? [{ label: inst.label, to: href({ view: "area", id: inst.key }) }] : []),
-    ...(ward ? [{ label: ward.label, to: href({ view: "area", id: ward.ward_code }) }] : []),
+/**
+ * Where you are in Varha → institution → ward, always visible (sticky). The current level is
+ * filled; levels above are links; the next level says what to pick.
+ */
+function LevelStepper({
+  data,
+  level,
+  inst,
+  parent,
+  ward,
+}: {
+  data: Anomalies;
+  level: Level;
+  inst?: InstitutionAnomalies;
+  parent?: InstitutionAnomalies;
+  ward?: WardAnomalies;
+}) {
+  const healthCentre = parent?.kind === "health_centre";
+  const steps: { level: Level; kind: string; name: string; to?: string }[] = [
+    { level: "varha", kind: "County", name: data.varha.label, to: href({ view: "area" }) },
+    healthCentre
+      ? { level: "ward", kind: "Health centre", name: ward!.label }
+      : {
+          level: "institution",
+          kind: "Hospital",
+          name: inst?.label ?? "Pick a hospital or health centre",
+          to: inst && href({ view: "area", id: inst.key }),
+        },
+    ...(healthCentre
+      ? []
+      : [{ level: "ward" as const, kind: "Ward", name: ward ? `${ward.ward_code} · ${ward.label}` : "Pick a ward" }]),
   ];
+  const here = steps.findIndex((s) => s.level === level);
+  const up = here > 0 ? steps[here - 1] : null;
+
   return (
-    <nav className="crumbs" aria-label="Level">
-      {items.map((c, i) => (
-        <span key={c.to}>
-          {i > 0 && <span className="crumb-sep">›</span>}
-          {i === items.length - 1 ? <strong>{c.label}</strong> : <a href={c.to}>{c.label}</a>}
-        </span>
-      ))}
+    <nav className="stepper" aria-label="Level">
+      {up && (
+        <a className="stepper-up" href={up.to} title={`Up to ${up.name}`}>
+          <span aria-hidden>↑</span> {up.name}
+        </a>
+      )}
+      <ol className="stepper-steps">
+        {steps.map((s, i) => {
+          const state = i < here ? "done" : i === here ? "current" : "next";
+          const body = (
+            <>
+              {state === "current" && (
+                <motion.span layoutId="stepper-current" className="stepper-fill" transition={{ duration: 0.3, ease }} />
+              )}
+              <span className="stepper-kind">{s.kind}</span>
+              <span className="stepper-name">{s.name}</span>
+            </>
+          );
+          return (
+            <li key={s.level} className={`stepper-step is-${state}`} aria-current={state === "current" ? "location" : undefined}>
+              {state === "done" && s.to ? <a href={s.to}>{body}</a> : <span>{body}</span>}
+            </li>
+          );
+        })}
+      </ol>
     </nav>
   );
 }

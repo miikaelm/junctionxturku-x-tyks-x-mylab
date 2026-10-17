@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type CdsCard, type Infection } from "../api/client";
 import { fmtDate } from "../lib/format";
 import { useFetch } from "../lib/hooks";
+import { ROLES } from "../lib/roles";
 import { href } from "../lib/route";
 import { useApp } from "../state/AppContext";
 
@@ -13,7 +14,7 @@ const INBOX_POLL_MS = 5000;
  * order-select when an antibiotic is chosen) and shows what AEI pushes to its webhook.
  */
 export function MockEhr({ patientId }: { patientId?: string }) {
-  const { asOf, meta } = useApp();
+  const { asOf, meta, role } = useApp();
   const [search, setSearch] = useState(patientId ?? "");
   const examples = useFetch((signal) => api.carriers({ as_of: asOf, days: 60, limit: 5 }, signal), [asOf, meta.data_version]);
   const patient = useFetch(
@@ -41,7 +42,7 @@ export function MockEhr({ patientId }: { patientId?: string }) {
       <header className="ehr-top">
         <strong>Potilaskertomus</strong> <span>· Patient record</span>
         <span className="ehr-demo">Mock hospital system (demo) · date {fmtDate(asOf)}</span>
-        <a href={href({ view: "start" })}>← Back to AEI</a>
+        <a href={href(ROLES[role.role].home)}>← Back to AEI</a>
       </header>
       <div className="ehr-body">
         <aside className="ehr-side">

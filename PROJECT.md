@@ -96,7 +96,7 @@ Three primary roles (keep it to ~3; confirm with the mentor, see §10.1).
 | V5 | **Ward × time heatmap** | R2, R3 | Heatmap of wards × weeks for phenotype counts (MRSA/ESBL/CPE/VRE) and key resistance rates. Shows at a glance where and when things changed. |
 | V6 | **Trend explorer & reports** (separate "not daily" workflow) | R3 | Long-term trends by organism–antibiotic, with guideline thresholds (e.g. 20 % line), period comparisons (year vs year), and annual-report export. |
 | V7 | **Data quality / feed status** | R3 | Sample volume per ward per day vs expected, gaps, last-received dates. Freshness also appears as a badge on every other view (VIEW-12). |
-| V8 | **Time cursor / replay control** (global header) | All, demo | Sets the "as-of" date. Every view and alert recomputes as if it were that day. |
+| V8 | **Time cursor / replay control** (demo bar docked at the bottom, closeable; holds the mock EHR link too) | All, demo | Sets the "as-of" date. Every view and alert recomputes as if it were that day. |
 | V9 | **AI assistant panel** | All | Natural-language questions and plain-language alert explanations. |
 | V10 | **Spread / footprint view** | R2 | For a chosen organism, phenotype or resistance profile: where it appears across wards over time, which wards share the same profile, and where the patients from a cluster went afterwards (PAT-03). |
 | V11 | **Mock patient-record (EHR) page** (demo) | Demo | A fake "doctor's main system" screen that calls our API and shows the returned cards (API-05). |
@@ -138,6 +138,13 @@ All detectors run automatically on every update (or as-of change) with general m
 - [x] **ANOM-06 (S)** Each alert records **why** it fired (observed vs expected, method, p-value or score) for display in V4 and for the AI explanation.
 - [x] **ANOM-07 (S)** Measure **detection latency** on replay: days from event start to first alert.
 - [x] **ANOM-08 (S)** **Novelty alert ("not seen here for a long time / ever"):** a phenotype (MRSA/ESBL/VRE/CPE) or rare organism appears on a ward where it hasn't been seen for a configurable period, or never before. The mentor's example was "not seen in 20 years"; our data covers only 3 years, so the longest possible lookback is "first since records began". Fires on the *first* case, before outbreak statistics can. Skip common organisms to avoid noise.
+- [ ] **ANOM-10 (S)** **Stewardship findings (owned, with a status):** a threshold crossing (an agent's
+  12-month resistance in a main organism of an infection reaching 20 % at a location) or a significant
+  slow drift (ANOM-03) becomes a finding for lab / stewardship (R3): new → under review → guideline
+  updated / accepted as is. Not an infection-control alert and not in their badge. The finding stays on
+  the clinician's avoid list as long-standing background with its review status ("Reviewed by
+  stewardship, Aug 2025: guideline updated"). Same general methods as ANOM-03; no hardcoded events
+  (E4 is the validation case).
 - [x] **ANOM-09 (S)** **Multi-ward signal:** the same phenotype with a similar resistance profile appears on ≥ 2 wards within a configurable window. Flags possible spread for infection control without claiming direction ("seen on URO and GER"), and feeds V10.
 
 ### 4.4 Notifications & sentinel events (NOTIF)
@@ -255,6 +262,23 @@ This phase reworks *how* the data is presented, per role. Decide the approach be
   layouts, role-specific landing pages (with VIEW-08). V1 got an early polish in slice 1. Slice 5 did the
   new views (drill-down animation, tiles, phone width for My Ward and the overview, quiet "fine" cells);
   the older views (alert detail, trends, spread, feed, carriers, mock EHR) still have slice 2–4 styling.
+  After the first review: a sticky level stepper on the overview, "Back to …" buttons, the demo bar and
+  an explicit "Change role" button. The spread view (V10) was found too busy; its redesign is open (§10).
+- [ ] **UX-07 (S)** **Avoid list says why, in words:** two groups, **"Long-standing"** (12-month figure
+  ≥ 20 %, with since when and direction) and **"New in the last 4 weeks"** (from an active resistance-shift
+  alert). Colour supports the words, it doesn't replace them. A new rise links to **both** related items,
+  each named for what it is: the resistance-shift alert (*the numbers*: 4 weeks vs the year before) and,
+  when the cases overlap, the outbreak it most likely comes from (*the cause*, worded as "N of the M resistant
+  isolates are cases of the URO ESBL cluster"). A long-standing item links to its stewardship finding
+  (ANOM-10) and shows its review status. A dismissed shift drops off the clinician's list.
+- [ ] **UX-08 (S)** **All infections at once:** My Ward shows the avoid list for every infection type as
+  its own short section (the ward's most common first), never pooled into one %; the infection control
+  narrows it. Sparse ones (blood) say where their numbers come from. The detailed table stays one
+  specimen at a time.
+- [ ] **UX-09 (S)** **The ward is a place, not a filter:** the ward is chosen in the page title
+  ("Urology ▾") and changes the address (`#/ward/MED-A`, back button works); "My ward" badge on one's own
+  ward, "Viewing … · back to my ward" on another. The filter bar keeps only what narrows the patient group
+  (sex, age, onset, infection).
 
 ---
 
@@ -412,6 +436,10 @@ E. faecalis (~10 %) is never tested for most agents and counts as not covered.
 | 2026-10-17 | **UX-05 recent rises:** the 12-month avoid list lags a sudden change, so an active resistance-shift alert on the ward for the infection's specimen adds its agents as "recent rise" (amber; observed 4-week rate vs the year before, link to the alert) and takes them off the "no local warning" line; an agent already flagged gets a "rising fast" tag. The order-select hook warns on them too. Found in the E1 check: during the URO outbreak ceftriaxone read "no warning" on 12-month data. |
 | 2026-10-17 | **UX-05 avoid-list details:** main organisms = ≥ 10 % of the infection's first isolates (most specific level with ≥ 30); each organism × agent falls back ward → institution → all like the antibiogram. "Since" = start of the unbroken run of monthly 12-month rates ≥ 20 % ("or earlier" when it reaches the start of the data). Direction = last 12 months vs the 12 before, Fisher p < 0.05 and ≥ 5 points, else stable. Intrinsic resistance is never a flag; agents most organisms resist intrinsically (vancomycin for a UTI) are listed as "doesn't act on most of these organisms". |
 | 2026-10-17 | **VIEW-09 colour means action:** cells below 10 % lose their green fill (quiet, outlined); amber and red keep theirs. Overview tiles and stripes are coloured only by anomaly severity. |
+| 2026-10-17 | **Orientation (review of slice 5):** the overview shows its level in a sticky stepper (County → Hospital → Ward; current level filled, levels above are links, the next says what to pick, plus an "↑ up" button); going deeper zooms in, going up zooms out. Pages reached from the overview, and detail pages, get a "← Back to …" button that names its target (from an in-app route history, falling back to the list). |
+| 2026-10-17 | **Demo tools out of the header:** the as-of date, replay, jump-to-alert and the mock EHR link sit in a bottom bar marked "Demo only" (real use always shows today). It can be closed to a small pill (open by default on desktop, closed on a phone); with it closed, a past as-of date shows as a chip in the header. The role chip reads "<Role> view" with an explicit "Change role" button. |
+| 2026-10-17 | **Avoid list, review 2 (UX-07):** long-standing high resistance is background, not an alert: it is on every ward and would keep the inbox full. It gets an owner instead: a stewardship finding (ANOM-10) for lab / stewardship, since the question it raises is "does the local guideline still fit?". A new rise is temporary and often one event seen twice (the agents that shifted on URO, CRO, CIP and CXM, are all in the ESBL cluster's resistance profile; the overlap of cases is still to be checked), so it links to both the shift (the numbers) and the outbreak (the likely cause), each labelled. Dismissing the shift removes it from clinicians' lists: accepted. |
+| 2026-10-17 | **Clinician page, review 2 (UX-08, UX-09):** infections are shown side by side rather than pooled (resistance is per specimen; organisms and suitable drugs differ by infection), with a control to focus one. Changing ward is navigation, so it moves out of the filter bar into the title. |
 | 2026-10-17 | **UX-06 notifications demoted:** alerts are first-party (inbox, overview, detail); notifications are delivery (email / Teams / webhook) and live under settings. Clinicians lose the badge and the alert strip; their ward's alerts appear inside the exceptions list. Infection-control nav becomes Overview (home) · Alerts · Spread · Carriers · ⚙. |
 
 ## 10. To-do & open questions
@@ -432,6 +460,8 @@ E. faecalis (~10 %) is never tested for most agents and counts as not covered.
 - [x] Choose the tech stack: React + FastAPI (§9).
 - [ ] Decide which remaining *(proposed)* requirements (EXT) to commit to, and set their priorities.
 - [x] Figure out how the Varha angle should work in the tool before building anything for it (UX-01, decided in §9).
+- [ ] Spread view (V10) is too busy (every case of a phenotype on every ward for months). Redesign: start from
+  the linked groups (one profile on ≥ 2 wards, shared patients) and show a focused timeline only for the group picked?
 
 ### 10.2 Open questions
 - Hackathon timeline and submission format?
@@ -488,4 +518,5 @@ Work is split into vertical slices, one commit series each. Update the status he
 | 3 | Replay, trends, discovery | LIVE-02/04 · ANOM-03, 07 · V6 trends, V5 heatmap · STAT-07 defaults, STAT-09 · DATA-05 incremental | done |
 | 4 | Patients + integration | PAT-01–03 · API-02–05 · NOTIF-03/05 · V2 therapy helper · V10 spread · V11 mock EHR · ANOM-05/09 · VIEW-08 roles (moved up from slice 5) | done |
 | 5 | Usability optimization | UX-02–06 (exceptions-first overview, Varha drill-down, clinician "avoid" view, notifications to settings, visual polish; UX-01 design decided) · role landing pages · VIEW-09 | done (UX-04 partly: older views keep plain styling) |
-| 6 | AI, extension data, delivery | AI-01–04 · EXT-* · README, demo presets · polish of the older views (rest of UX-04) | next |
+| 5b | Review fixes | UX-07–09 (avoid list groups and links, all infections, ward switcher) · ANOM-10 stewardship findings · orientation and demo bar (done) | next |
+| 6 | AI, extension data, delivery | AI-01–04 · EXT-* · README, demo presets · polish of the older views (rest of UX-04) · spread redesign (§10) | |

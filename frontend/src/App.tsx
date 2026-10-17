@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type AlertList, type AlertSummary } from "./api/client";
+import { BackButton, backTarget } from "./components/BackButton";
+import { DemoBar, type ReplaySettings } from "./components/DemoBar";
 import { Header } from "./components/Header";
-import { ReplayBar, type ReplaySettings } from "./components/ReplayBar";
 import { addDays } from "./lib/format";
 import { useFetch, useIdle, useLocalStorage } from "./lib/hooks";
 import type { RoleSetting } from "./lib/roles";
@@ -36,7 +37,9 @@ export default function App() {
   });
   const [news, setNews] = useState<AlertSummary[]>([]);
   const [role, setRole] = useLocalStorage<RoleSetting | null>("aei.role", null);
-  const route = useHashRoute();
+  // Demo tools start open on a desktop, closed on a phone where they would cover the page.
+  const [demoOpen, setDemoOpen] = useLocalStorage("aei.demo.open", window.matchMedia("(min-width: 601px)").matches);
+  const { route, prev: prevRoute } = useHashRoute();
   const asOf = asOfState ?? meta?.default_as_of ?? null;
   const alerts = useFetch(
     (signal) => (asOf ? api.alerts({ as_of: asOf }, signal) : Promise.resolve(null)),
@@ -114,6 +117,7 @@ export default function App() {
   // count new non-routine alerts (NOTIF-03).
   const badge = role?.role === "clinician" ? null : (alerts.data?.counts.new ?? 0);
   const picking = !role || route.view === "start";
+  const back = backTarget(route, prevRoute);
 
   return (
     <AppContext.Provider
@@ -139,9 +143,9 @@ export default function App() {
         <RolePicker meta={meta} current={role} onPick={setRole} />
       ) : (
         <>
-          <Header route={route} badge={badge} />
-          <ReplayBar settings={replay} onSettings={setReplay} />
-          <main className="page">
+          <Header route={route} badge={badge} demoOpen={demoOpen} onDemo={() => setDemoOpen(true)} />
+          <main className={`page ${demoOpen ? "with-demo" : ""}`}>
+            {back && <BackButton {...back} />}
             {route.view === "ward" && <MyWard ward={route.id} />}
             {route.view === "area" && <Area id={route.id} />}
             {route.view === "alerts" && <AlertInbox />}
@@ -154,6 +158,7 @@ export default function App() {
             {route.view === "patient" && <PatientView id={route.id} />}
             {route.view === "notifications" && <Notifications />}
           </main>
+          <DemoBar settings={replay} onSettings={setReplay} open={demoOpen} onOpen={setDemoOpen} />
         </>
       )}
     </AppContext.Provider>

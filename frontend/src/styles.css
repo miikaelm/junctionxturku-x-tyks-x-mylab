@@ -14,6 +14,7 @@
   --text-3: #808a97;
   --accent: #1d5fd1;
   --accent-soft: #e8effc;
+  --on-accent: #ffffff;
 
   --good: #17804a;
   --good-bg: #e3f4ea;
@@ -50,6 +51,7 @@
     --text-3: #75808e;
     --accent: #6ea0ff;
     --accent-soft: #1c2a44;
+    --on-accent: #0f141a;
     --good: #4cc787;
     --good-bg: #133324;
     --warn: #f0b44c;
@@ -862,7 +864,10 @@ a.nav-item {
   }
   .nav {
     order: 3;
-    width: 100%;
+    flex: 1 1 100%;
+  }
+  .role-chip {
+    margin-left: auto;
   }
   .cursor {
     margin-left: auto;
@@ -1227,21 +1232,6 @@ a {
 }
 
 /* ---------- Replay, overview, trends, lab feed (slice 3: plain styles; polish in slice 5) ---------- */
-.replay {
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--line);
-}
-.replay-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  max-width: 1680px;
-  margin: 0 auto;
-  padding: 6px 24px;
-  font-size: 13px;
-  color: var(--text-2);
-}
 .replay-field {
   display: inline-flex;
   align-items: center;
@@ -1275,26 +1265,6 @@ a {
   opacity: 0.45;
   cursor: default;
 }
-.replay-news {
-  max-width: 1680px;
-  margin: 0 auto;
-  padding: 6px 24px 10px;
-  font-size: 13px;
-}
-.replay-news-head {
-  display: flex;
-  gap: 12px;
-  align-items: baseline;
-}
-.replay-news ul {
-  list-style: none;
-  margin: 4px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
 .ab-subrow .ab-org {
   font-size: 12px;
 }
@@ -1423,11 +1393,6 @@ a {
 @media (max-width: 860px) {
   .trend-findings {
     grid-template-columns: 1fr;
-  }
-  .replay-bar,
-  .replay-news {
-    padding-left: 16px;
-    padding-right: 16px;
   }
 }
 
@@ -1833,7 +1798,7 @@ a {
   .ehr-form {
     grid-template-columns: 1fr;
   }
-  .role-chip {
+  .role-view {
     display: none;
   }
 }
@@ -2028,22 +1993,6 @@ a.brand {
 /* Drill-down (UX-01–03) */
 .area {
   max-width: 1100px;
-}
-.crumbs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 4px 0 12px;
-  font-size: 13px;
-  color: var(--text-2);
-}
-.crumbs a {
-  color: var(--accent);
-  text-decoration: none;
-}
-.crumb-sep {
-  margin-right: 6px;
-  color: var(--text-3);
 }
 .level-head {
   display: flex;
@@ -2342,5 +2291,421 @@ a.brand {
   }
   .count.big .count-n {
     font-size: 32px;
+  }
+}
+
+/* ---------- Orientation and demo tools (slice 5 feedback) ---------- */
+:root {
+  --topbar-h: 53px;
+}
+.role-chip {
+  gap: 10px;
+}
+.role-view {
+  color: var(--text-2);
+  font-weight: 600;
+}
+.role-switch {
+  padding: 5px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+.role-switch:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.asof-chip {
+  padding: 5px 12px;
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* A clear way back, naming where it goes */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 7px 14px 7px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow);
+}
+.back-btn span {
+  color: var(--accent);
+  font-size: 16px;
+  line-height: 1;
+}
+.back-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Level stepper: Varha → institution → ward */
+.stepper {
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 10;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin: -12px 0 18px;
+  padding: 12px 0;
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(8px);
+}
+.stepper-up {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+}
+.stepper-up span {
+  color: var(--accent);
+  font-size: 16px;
+}
+.stepper-up:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.stepper-steps {
+  display: flex;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+.stepper-step {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.stepper-step > a,
+.stepper-step > span {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  margin-right: -6px;
+  padding: 8px 22px 8px 26px;
+  color: var(--text-2);
+  background: var(--surface);
+  text-decoration: none;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%);
+}
+.stepper-step:first-child > a,
+.stepper-step:first-child > span {
+  padding-left: 16px;
+  border-radius: var(--radius) 0 0 var(--radius);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%);
+}
+.stepper-step:last-child > a,
+.stepper-step:last-child > span {
+  margin-right: 0;
+}
+.stepper-fill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--accent);
+}
+.stepper-kind {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.stepper-name {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stepper-step.is-current > span {
+  color: var(--on-accent);
+}
+.stepper-step.is-done > a {
+  color: var(--accent);
+}
+.stepper-step.is-done > a:hover {
+  background: var(--accent-soft);
+}
+.stepper-step.is-next > span {
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+.stepper-step.is-next .stepper-name {
+  font-style: italic;
+  font-weight: 500;
+}
+/* Each level reads differently, so the change of level shows at a glance */
+.area-varha .level-head h1 {
+  font-size: 30px;
+}
+.area-institution .level-head {
+  border-left-width: 10px;
+}
+.area-ward .level-head {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--line-strong);
+}
+.area-ward .level-head.stripe-critical,
+.area-ward .level-head.stripe-high {
+  border-left-color: var(--bad);
+}
+.area-ward .level-head.stripe-medium {
+  border-left-color: var(--warn);
+}
+
+/* Demo tools, docked at the bottom */
+.page.with-demo {
+  padding-bottom: 140px;
+}
+.demo {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+.demo > * {
+  pointer-events: auto;
+}
+.demo-bar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  padding: 10px 56px 10px 24px;
+  background: var(--surface);
+  border-top: 2px dashed var(--line-strong);
+  box-shadow: 0 -6px 24px rgb(16 24 40 / 0.1);
+  font-size: 13px;
+  color: var(--text-2);
+}
+.demo-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 260px;
+}
+.demo-tag {
+  align-self: flex-start;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--text);
+  color: var(--surface);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.demo-note {
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.3;
+}
+.demo-replay {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  min-width: 0;
+}
+.demo-replay .replay-jump {
+  flex: 1;
+  min-width: 200px;
+}
+.demo-replay .replay-jump select {
+  width: 100%;
+  max-width: 420px;
+}
+.demo-ehr {
+  padding: 7px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.demo-ehr:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.demo-close {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.demo-close:hover {
+  background: var(--line);
+}
+.demo-news {
+  max-width: 760px;
+  max-height: 40vh;
+  overflow: auto;
+  margin: 0 24px 10px auto;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+}
+.demo-news-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.demo-news ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.demo-pill {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+}
+.demo-pill.is-past {
+  border-color: var(--warn);
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.demo-pill .demo-tag {
+  align-self: center;
+}
+
+@media (max-width: 860px) {
+  .demo-label {
+    flex: 1 1 100%;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+    max-width: none;
+  }
+  .page.with-demo {
+    padding-bottom: 260px;
+  }
+}
+@media (max-width: 600px) {
+  .stepper {
+    flex-direction: column;
+    gap: 8px;
+    margin: -8px 0 14px;
+    padding: 8px 0;
+  }
+  .stepper-up {
+    align-self: flex-start;
+    padding: 6px 12px;
+  }
+  .stepper-step > a,
+  .stepper-step > span {
+    padding: 6px 18px 6px 20px;
+  }
+  .stepper-name {
+    font-size: 13px;
+  }
+  .demo-bar {
+    gap: 8px 12px;
+    padding: 10px 48px 10px 16px;
+  }
+  .demo-note {
+    display: none;
+  }
+  .demo-news {
+    margin: 0 12px 8px;
+  }
+  .role-switch {
+    padding: 4px 10px;
+  }
+}
+
+@media (max-width: 600px) {
+  .nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .demo-replay .replay-opt {
+    display: none;
+  }
+  .demo-replay {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+  }
+  .replay-play {
+    white-space: nowrap;
+  }
+  .demo-replay .replay-jump {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .demo-ehr {
+    padding: 5px 12px;
+  }
+  .page.with-demo {
+    padding-bottom: 220px;
   }
 }

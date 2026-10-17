@@ -1,7 +1,7 @@
 import { addDays } from "../lib/format";
 import { useApp } from "../state/AppContext";
 
-/** Global as-of control (LIVE-01, V8). Replay playback comes later (LIVE-02). */
+/** Global as-of control (LIVE-01, V8), shown in the demo bar. */
 export function TimeCursor() {
   const { meta, asOf, setAsOf } = useApp();
   const isToday = asOf === meta.default_as_of;

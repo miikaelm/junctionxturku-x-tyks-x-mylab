@@ -1,17 +1,41 @@
+import { useEffect, useRef } from "react";
+import { fmtDate } from "../lib/format";
 import { ROLES } from "../lib/roles";
 import { href, type Route } from "../lib/route";
 import { useApp } from "../state/AppContext";
-import { TimeCursor } from "./TimeCursor";
 
 const VIEW_OF: Partial<Record<Route["view"], Route["view"]>> = { alert: "alerts", patient: "patients" };
 
-/** Top bar. Clinicians get no badge (UX-06): their ward's alerts are on My Ward itself. */
-export function Header({ route, badge }: { route: Route; badge: number | null }) {
-  const { role } = useApp();
+/**
+ * Top bar. Clinicians get no badge (UX-06): their ward's alerts are on My Ward itself. The date
+ * controls live in the demo bar; a past date is flagged here when that bar is hidden.
+ */
+export function Header({
+  route,
+  badge,
+  demoOpen,
+  onDemo,
+}: {
+  route: Route;
+  badge: number | null;
+  demoOpen: boolean;
+  onDemo: () => void;
+}) {
+  const { role, asOf, meta } = useApp();
   const info = ROLES[role.role];
+  const past = asOf < meta.default_as_of;
+  // Sticky elements below the bar (the overview's level stepper) sit at its height.
+  const bar = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = bar.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => document.documentElement.style.setProperty("--topbar-h", `${el.offsetHeight}px`));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const view = VIEW_OF[route.view] ?? route.view;
   return (
-    <header className="topbar">
+    <header className="topbar" ref={bar}>
       <a className="brand" href={href(info.home)} title="Home">
         <span className="brand-mark" aria-hidden>
           <svg viewBox="0 0 24 24" width="18" height="18">
@@ -44,16 +68,19 @@ export function Header({ route, badge }: { route: Route; badge: number | null })
           </a>
         ))}
       </nav>
+      {past && !demoOpen && (
+        <button type="button" className="asof-chip" onClick={onDemo} title="Showing the data as it was on this date (demo)">
+          Viewing {fmtDate(asOf)}
+        </button>
+      )}
       <div className="role-chip">
-        <span className="role-text">
-          <a href={href({ view: "start" })} title="Switch role">
-            {info.label}
-            {role.ward ? ` · ${role.ward}` : ""}
-          </a>
-          <a href={href({ view: "ehr" })} className="muted small" title="AEI inside a mock hospital patient record (demo)">
-            EHR demo
-          </a>
+        <span className="role-view">
+          {info.label} view
+          {role.ward ? <span className="mono"> · {role.ward}</span> : ""}
         </span>
+        <a className="role-switch" href={href({ view: "start" })}>
+          Change role
+        </a>
         {info.settings && (
           <a
             href={href({ view: "notifications" })}
@@ -73,7 +100,6 @@ export function Header({ route, badge }: { route: Route; badge: number | null })
           </a>
         )}
       </div>
-      <TimeCursor />
     </header>
   );
 }
