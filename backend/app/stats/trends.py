@@ -32,22 +32,21 @@ from app.data.first_isolate import FIRST_ISOLATE_KEY, first_isolates
 from app.data.intrinsic import INTRINSIC_RESISTANCE
 from app.data.scope import Scope
 from app.detectors.common import bh_qvalues, significant
+from app.memo import Memo
 from app.stats.proportions import estimate
 
 SERIES = ["loc", "specimen", "organism", "antibiotic_code"]
 
-_memo: dict[tuple, tuple[Dataset, object]] = {}
+_memo = Memo(48)
+_MISS = object()
 
 
 def _cached(ds: Dataset, key: tuple, compute):
-    full = (id(ds), *key)
-    hit = _memo.get(full)
-    if hit is not None and hit[0] is ds:
-        return hit[1]
-    value = compute()
-    if len(_memo) >= 16:
-        _memo.clear()
-    _memo[full] = (ds, value)
+    """`key` ends with the as-of date (pinned dates are kept, see app.memo)."""
+    value = _memo.get(ds, key, _MISS)
+    if value is _MISS:
+        value = compute()
+        _memo.put(ds, key, key[-1], value)
     return value
 
 
@@ -168,9 +167,15 @@ def findings(ds: Dataset, as_of: date) -> dict:
     trends.sort(key=lambda f: (f["trend"]["direction"] != "up", f["trend"]["q_value"]))
 
     crossings = []
-    y0 = years.xs(0, level="block")
-    y1 = years.xs(1, level="block")
-    both = y0.join(y1, lsuffix="0", rsuffix="1", how="inner")
+    blocks = set(years.index.get_level_values("block"))
+    if not {0, 1} <= blocks:
+        # Less than a year of data before the last 12 months (as-of before Oct 2024): no
+        # year-on-year comparison yet.
+        both = pd.DataFrame(columns=["n0", "r0", "n1", "r1"])
+    else:
+        y0 = years.xs(0, level="block")
+        y1 = years.xs(1, level="block")
+        both = y0.join(y1, lsuffix="0", rsuffix="1", how="inner")
     both = both[(both.n0 >= MIN_ISOLATES_FOR_PERCENT) & (both.n1 >= MIN_ISOLATES_FOR_PERCENT)]
     pct0, pct1 = 100 * both.r0 / both.n0, 100 * both.r1 / both.n1
     up = (pct1 < EMPIRICAL_THRESHOLD_PCT) & (pct0 >= EMPIRICAL_THRESHOLD_PCT)

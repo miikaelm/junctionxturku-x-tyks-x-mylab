@@ -341,3 +341,34 @@ STEWARDSHIP_KINDS = {
 # (Fisher exact, at least SUBGROUP_MIN_DIFF_PP apart, n ≥ SUBGROUP_MIN_N on both sides, FDR across
 # every comparison on the list). Shown only when the group changes the answer.
 AVOID_SUBGROUP_DIMENSIONS = ("sex", "age_band", "hospital_acquired")
+
+# ---------- Demo and delivery (slice 6) ----------
+# Mock patient record (V11): the date and the patients its ward list opens with (docs/DEMO.md).
+# Demo setup only; detection never sees these.
+EHR_DEMO = {
+    "as_of": date(2025, 6, 27),
+    "ward": "URO",
+    "patients": ("P006127", "P006301"),
+}
+# Results computed at startup and kept cached (NF-01): today, the mock patient record's date and
+# the day each alert of these types was raised (the replay "jump to" targets most worth showing).
+WARM_ALERT_TYPES = ("cluster", "multi_ward", "data_gap")
+# Order check (API-02): the patient's own isolates from this many days back are shown with the
+# chosen antibiotic's result; a resistant one outranks the ward's figures.
+OWN_RESULT_DAYS = 365
+# WHO AWaRe groups (2023 list) of the panel's agents: "change to" suggestions offer Access agents
+# before Watch ones (stewardship), then by estimated coverage. FOX is a screen, not a treatment.
+AWARE_GROUPS = {
+    "AMP": "Access",
+    "MEC": "Access",
+    "TMP": "Access",
+    "NIT": "Access",
+    "CLI": "Access",
+    "TZP": "Watch",
+    "CXM": "Watch",
+    "CRO": "Watch",
+    "CAZ": "Watch",
+    "CIP": "Watch",
+    "MEM": "Watch",
+    "VAN": "Watch",
+}

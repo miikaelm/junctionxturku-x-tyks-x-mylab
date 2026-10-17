@@ -155,6 +155,22 @@ export function FindingView({ id }: { id: string }) {
               {data.level !== "ward" && <span className="muted"> (their own numbers are too few, so they use {data.location_label})</span>}
             </p>
           )}
+          {data.national && (
+            <p className="small">
+              Finland {data.national.year}
+              {data.national.group ? ` (${data.national.group})` : ""}: <strong className="mono">{data.national.pct} %</strong> of{" "}
+              {data.national.n.toLocaleString("en-GB")} {data.national.specimen_label} isolates (
+              <a href={data.national.url} target="_blank" rel="noreferrer">
+                {data.national.source}
+              </a>
+              ).{" "}
+              {e.ci_low > data.national.pct
+                ? "The local figure is above it (whole interval): a local problem, not just the national picture."
+                : e.ci_high < data.national.pct
+                  ? "The local figure is below it (whole interval)."
+                  : "The local figure is within reach of it."}
+            </p>
+          )}
           <p className="muted small">
             Not an alert: long-standing resistance needs a guideline decision, not an investigation. Clinicians see it on
             their avoid list together with the review status set here.

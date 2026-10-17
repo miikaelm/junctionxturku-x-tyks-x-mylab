@@ -20,6 +20,7 @@ import { PatientView, Patients } from "./views/Patients";
 import { RolePicker } from "./views/RolePicker";
 import { Spread } from "./views/Spread";
 import { FindingView } from "./views/Stewardship";
+import { Explore } from "./views/Explore";
 import { Trends } from "./views/Trends";
 
 const STATUS_POLL_MS = 10_000;
@@ -153,6 +154,7 @@ export default function App() {
             {route.view === "alert" && <AlertDetailView id={route.id} />}
             {route.view === "heatmap" && <Heatmap />}
             {route.view === "trends" && <Trends />}
+            {route.view === "explore" && <Explore />}
             {route.view === "feed" && <FeedStatus />}
             {route.view === "spread" && <Spread />}
             {route.view === "patients" && <Patients />}

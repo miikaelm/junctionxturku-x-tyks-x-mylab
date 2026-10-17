@@ -212,7 +212,7 @@ def test_therapy_coverage_is_the_weighted_sum():
 
 def test_cds_hooks_services(client):
     services = client.get("/api/cds-services").json()["services"]
-    assert {s["hook"] for s in services} == {"order-select", "patient-view"}
+    assert {s["hook"] for s in services} == {"order-select", "order-sign", "patient-view"}
     cards = client.post(
         "/api/cds-services/aei-antibiotic-choice",
         params={"as_of": "2025-06-20"},

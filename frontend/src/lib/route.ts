@@ -10,6 +10,7 @@ export type Route =
   | { view: "feed" }
   | { view: "heatmap" }
   | { view: "trends" }
+  | { view: "explore" }
   | { view: "spread" }
   | { view: "patients" }
   | { view: "patient"; id: string }
@@ -17,7 +18,7 @@ export type Route =
   | { view: "finding"; id: string }
   | { view: "ehr"; id?: string };
 
-const SIMPLE = ["start", "feed", "heatmap", "trends", "spread", "patients", "notifications"] as const;
+const SIMPLE = ["start", "feed", "heatmap", "trends", "explore", "spread", "patients", "notifications"] as const;
 
 export function parseHash(hash: string): Route {
   const [view, id] = hash.replace(/^#\/?/, "").split("/");
@@ -73,6 +74,7 @@ const LABELS: Partial<Record<Route["view"], string>> = {
   alert: "the alert",
   heatmap: "the heatmap",
   trends: "stewardship",
+  explore: "explore",
   finding: "the finding",
   feed: "the lab feed",
   spread: "spread",

@@ -51,22 +51,21 @@ from app.data.first_isolate import first_isolates
 from app.data.intrinsic import is_intrinsic
 from app.data.scope import Scope
 from app.detectors.common import bh_qvalues, significant
+from app.memo import Memo
 from app.stats.antibiogram import reported_antibiotics
 from app.stats.proportions import estimate
 from app.stats.subgroups import value_label
 
-_memo: dict[tuple, tuple[Dataset, dict]] = {}
+# Every ward × infection on a warmed date stays cached (pinned dates, see app.memo).
+_memo = Memo(400)
 
 
 def avoid(ds: Dataset, scope: Scope, infection: str, as_of: date) -> dict:
-    key = (id(ds), scope, infection, as_of)
-    hit = _memo.get(key)
-    if hit is not None and hit[0] is ds:
-        return hit[1]
-    out = _avoid(ds, scope, infection, as_of)
-    if len(_memo) >= 64:
-        _memo.clear()
-    _memo[key] = (ds, out)
+    key = (scope, infection, as_of)
+    out = _memo.get(ds, key)
+    if out is None:
+        out = _avoid(ds, scope, infection, as_of)
+        _memo.put(ds, key, as_of, out)
     return out
 
 

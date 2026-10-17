@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import type { Antibiogram as AntibiogramData, Cell, Estimate, Meta } from "../api/client";
+import { windowCell, type Antibiogram as AntibiogramData, type Cell, type Estimate, type Meta } from "../api/client";
 import { levelMark, pct, tier } from "../lib/format";
 import { useApp } from "../state/AppContext";
 import { CiBar } from "./CiBar";
@@ -10,8 +10,14 @@ interface Props {
   onSelect: (organism: string, code: string, sub?: string) => void;
 }
 
-/** Organism × antibiotic table, each cell showing last 4 weeks next to last 12 months. */
+/**
+ * Organism × antibiotic table, each cell showing last 4 weeks next to last 12 months; or, for a
+ * chosen period (VIEW-02), one figure per cell.
+ */
 export function Antibiogram({ data, onSelect }: Props) {
+  const period = data.period ? data.windows[0] : null;
+  const count = (iso: Record<string, number[]>) =>
+    period ? `${iso[period.key][0]}` : `${iso.annual[0]} / ${iso.recent[0]}`;
   return (
     <div className="ab-scroll">
       <table className="ab">
@@ -19,24 +25,25 @@ export function Antibiogram({ data, onSelect }: Props) {
           <tr>
             <th className="ab-org-head" scope="col">
               <span>Organism</span>
-              <span className="ab-org-head-sub">first isolates · 12 mo / 4 wk</span>
+              <span className="ab-org-head-sub">first isolates · {period ? period.label : "12 mo / 4 wk"}</span>
             </th>
             {data.antibiotics.map((a) => (
               <th key={a.code} scope="col" className="ab-abx-head" title={`${a.name} (${a.class})`}>
                 <span className="ab-abx-code">{a.code}</span>
                 <span className="ab-abx-name">{a.name.replace(" (screen)", "")}</span>
-                <span className="ab-abx-windows" aria-hidden>
-                  <span>4 wk</span>
-                  <span>12 mo</span>
-                </span>
+                {!period && (
+                  <span className="ab-abx-windows" aria-hidden>
+                    <span>4 wk</span>
+                    <span>12 mo</span>
+                  </span>
+                )}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
           {data.organisms.map((o) => {
-            const ownAnnual = o.isolates.annual[0];
-            const ownRecent = o.isolates.recent[0];
+            const ownAnnual = (o.isolates as Record<string, number[]>)[period?.key ?? "annual"][0];
             return (
               <Fragment key={o.organism}>
               <tr className={ownAnnual === 0 ? "ab-row-empty" : ""}>
@@ -46,9 +53,7 @@ export function Antibiogram({ data, onSelect }: Props) {
                     <span className="ab-share" aria-hidden>
                       <span style={{ width: `${Math.max(o.share_annual * 100, ownAnnual ? 2 : 0)}%` }} />
                     </span>
-                    <span className="mono">
-                      {ownAnnual} / {ownRecent}
-                    </span>
+                    <span className="mono">{count(o.isolates)}</span>
                   </span>
                 </th>
                 {data.antibiotics.map((a) => {
@@ -59,6 +64,7 @@ export function Antibiogram({ data, onSelect }: Props) {
                         <CellButton
                           cell={cell}
                           levels={data.levels}
+                          period={period?.key}
                           label={`${o.organism}, ${a.name}`}
                           onClick={() => onSelect(o.organism, a.code)}
                         />
@@ -76,9 +82,7 @@ export function Antibiogram({ data, onSelect }: Props) {
                   <th scope="row" className="ab-org ab-sub">
                     <span className="ab-org-name">↳ {sub.label}</span>
                     <span className="ab-org-meta">
-                      <span className="mono">
-                        {sub.isolates.annual[0]} / {sub.isolates.recent[0]}
-                      </span>
+                      <span className="mono">{count(sub.isolates)}</span>
                     </span>
                   </th>
                   {data.antibiotics.map((a) => {
@@ -89,6 +93,7 @@ export function Antibiogram({ data, onSelect }: Props) {
                           <CellButton
                             cell={cell}
                             levels={data.levels}
+                            period={period?.key}
                             label={`${o.organism} (${sub.label}), ${a.name}`}
                             onClick={() => onSelect(o.organism, a.code, sub.label)}
                           />
@@ -112,11 +117,14 @@ export function Antibiogram({ data, onSelect }: Props) {
 function CellButton({
   cell,
   levels,
+  period,
   label,
   onClick,
 }: {
   cell: Cell;
   levels: AntibiogramData["levels"];
+  /** The chosen period's window key: one figure instead of two. */
+  period?: string;
   label: string;
   onClick: () => void;
 }) {
@@ -125,6 +133,17 @@ function CellButton({
     return (
       <button type="button" className="ab-cell ab-intrinsic" onClick={onClick} aria-label={`${label}: intrinsically resistant`}>
         <span>Intrinsic R</span>
+      </button>
+    );
+  }
+
+  if (period) {
+    const wc = windowCell(cell, period);
+    const est = wc.shown === null ? wc.levels[0] : wc.levels[wc.shown];
+    const m = wc.shown ? levelMark(levels[wc.shown].level, levels[wc.shown].location) : "";
+    return (
+      <button type="button" className="ab-cell is-single" onClick={onClick} aria-label={`${label}: details`}>
+        <Half est={est} thresholds={meta.thresholds} kind="annual" mark={m} fallback={wc.shown === null} />
       </button>
     );
   }

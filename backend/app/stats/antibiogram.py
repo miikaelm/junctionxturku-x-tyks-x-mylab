@@ -7,6 +7,10 @@ show the most specific reliable number and explain what it fell back from.
 One organism can be split into sub-rows by a patient dimension (STAT-07), e.g. urine E. coli by
 sex by default (config.DEFAULT_SPLITS). Each sub-row is a full row for that subgroup, with its
 own fallbacks.
+
+A period other than the default (VIEW-02, DATA-04: a calendar year or a custom range) replaces the
+two windows with that one window. Each cell also carries the national reference (DATA-08) when
+Finres reports the pair.
 """
 
 from dataclasses import dataclass, replace
@@ -14,7 +18,7 @@ from datetime import date
 
 import pandas as pd
 
-from app.data import windows
+from app.data import national, windows
 from app.data.dataset import Dataset
 from app.data.first_isolate import first_isolates
 from app.data.intrinsic import is_intrinsic
@@ -57,10 +61,17 @@ def split_values(ds: Dataset, by: str) -> list:
     return sorted(values.tolist())
 
 
-def build_antibiogram(ds: Dataset, scope: Scope, as_of: date, split: Split | None = None) -> dict:
+def build_antibiogram(
+    ds: Dataset,
+    scope: Scope,
+    as_of: date,
+    split: Split | None = None,
+    period: Window | None = None,
+) -> dict:
+    """The last 4 weeks next to the last 12 months, or one chosen `period`."""
     if not scope.specimen:
         raise ValueError("an antibiogram needs a specimen type")
-    wins = [windows.recent(as_of), windows.annual(as_of)]
+    wins = [period] if period else [windows.recent(as_of), windows.annual(as_of)]
     chain = scope.chain(ds.wards)
     results = {w.key: [resistance_counts(ds, s, w) for s in chain] for w in wins}
 
@@ -68,8 +79,9 @@ def build_antibiogram(ds: Dataset, scope: Scope, as_of: date, split: Split | Non
     seen = ds.isolates[
         ds.isolates.specimen.eq(scope.specimen) & (ds.isolates.sample_date <= pd.Timestamp(as_of))
     ]
-    own_annual = results["annual"][0][1]
-    all_annual = results["annual"][-1][1]
+    main = wins[-1].key  # the longer window orders the rows
+    own_annual = results[main][0][1]
+    all_annual = results[main][-1][1]
     organisms = sorted(
         seen.organism.unique(),
         key=lambda o: (-own_annual.get(o, 0), -all_annual.get(o, 0), o),
@@ -86,7 +98,7 @@ def build_antibiogram(ds: Dataset, scope: Scope, as_of: date, split: Split | Non
     for org in organisms:
         row = {
             "organism": org,
-            **_row(ds, org, codes, results, wins),
+            **_row(ds, org, codes, results, wins, scope),
             "share_annual": round(own_annual.get(org, 0) / own_total, 3) if own_total else 0,
         }
         if split is not None and split.organism == org:
@@ -101,6 +113,8 @@ def build_antibiogram(ds: Dataset, scope: Scope, as_of: date, split: Split | Non
             for s in chain
         ],
         "windows": [w.to_dict() for w in wins],
+        "period": period is not None,
+        "national_source": national.SOURCE,
         "antibiotics": [
             {
                 "code": a.antibiotic_code,
@@ -115,18 +129,25 @@ def build_antibiogram(ds: Dataset, scope: Scope, as_of: date, split: Split | Non
     }
 
 
-def _row(ds: Dataset, org: str, codes: list[str], results: dict, wins: list[Window]) -> dict:
+def _row(
+    ds: Dataset, org: str, codes: list[str], results: dict, wins: list[Window], scope: Scope
+) -> dict:
     cells: dict[str, dict | None] = {}
     for code in codes:
         if (org, code) not in ds.tested_pairs:
             cells[code] = None  # never tested / not reported for this organism
             continue
-        cell: dict = {"intrinsic": is_intrinsic(org, code)}
+        cell: dict = {
+            "intrinsic": is_intrinsic(org, code),
+            "national": national.lookup(org, scope.specimen, code, scope.sex),
+        }
         for w in wins:
             levels = [_estimate_for(counts, org, code) for counts, _ in results[w.key]]
             shown = next((i for i, e in enumerate(levels) if e["sufficient"]), None)
             cell[w.key] = {"levels": levels, "shown": shown}
-        if cell["recent"]["levels"][0]["sufficient"]:
+        if len(wins) == 1:
+            cell["headline"] = wins[0].key if cell[wins[0].key]["shown"] is not None else None
+        elif cell["recent"]["levels"][0]["sufficient"]:
             cell["headline"] = "recent"
         elif cell["annual"]["shown"] is not None:
             cell["headline"] = "annual"
@@ -150,7 +171,7 @@ def _split(ds, scope, split: Split, org, codes, wins) -> dict:
             {
                 "value": value,
                 "label": value_label(split.by, value),
-                **_row(ds, org, codes, results, wins),
+                **_row(ds, org, codes, results, wins, sub),
             }
         )
     return {"by": split.by, "default": split.default, "rows": rows}

@@ -10,8 +10,14 @@ import { useApp } from "../state/AppContext";
 /** V3 Alert inbox: every alert as of the time cursor, most urgent first (NOTIF-02). */
 export function AlertInbox() {
   const { meta, asOf, alertsVersion, role } = useApp();
-  // A clinician starts on their own ward, the other roles on all wards (NOTIF-03).
-  const [location, setLocation] = useLocalStorage(`aei.alerts.location.${role.role}`, role.ward ?? "all");
+  // A clinician opens on the ward they are looking at (My Ward remembers it), else their own; it
+  // is not remembered here, so the list always follows them. Other roles keep their choice.
+  const [lastWard] = useLocalStorage("aei.location", role.ward ?? "all");
+  const [kept, setKept] = useLocalStorage(`aei.alerts.location.${role.role}`, "all");
+  const [here, setHere] = useState(lastWard || role.ward || "all");
+  const clinician = role.role === "clinician";
+  const location = clinician ? here : kept;
+  const setLocation = clinician ? setHere : setKept;
   const [type, setType] = useState<AlertType | "">("");
   const [includeResolved, setIncludeResolved] = useState(false);
   const [hideDismissed, setHideDismissed] = useState(true);
@@ -34,7 +40,11 @@ export function AlertInbox() {
       <section className="ward-head">
         <div>
           <p className="eyebrow">{ROLES[role.role].label}</p>
-          <h1>Alerts</h1>
+          <h1>
+            Alerts
+            {location !== "all" &&
+              ` · ${meta.wards.find((w) => w.ward_code === location)?.ward_en ?? meta.locations.find((l) => l.code === location)?.label ?? location}`}
+          </h1>
           <p className="ward-sub">
             {data ? `${data.counts.active} active · ${data.counts.new} new` : "…"} · as of {fmtDate(asOf)}
           </p>

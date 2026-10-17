@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.alerts import engine
+from app import demo
 from app.api.cds import router as cds_router
 from app.api.routes import router
 from app.data.store import get_store
@@ -12,9 +12,10 @@ from app.data.store import get_store
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Load the data and run the detectors in the background so the first page is fast.
+    # Load the data, run the detectors and compute the slow per-date results for today and the
+    # demo dates in the background, so the first pages are fast (NF-01).
     threading.Thread(
-        target=lambda: engine.warm(get_store().dataset, get_store().today()), daemon=True
+        target=lambda: demo.warm(get_store().dataset, get_store().today()), daemon=True
     ).start()
     yield
 

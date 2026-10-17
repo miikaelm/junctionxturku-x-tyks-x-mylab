@@ -99,7 +99,8 @@ Three primary roles (keep it to ~3; confirm with the mentor, see §10.1).
 | V8 | **Time cursor / replay control** (demo bar docked at the bottom, closeable; holds the mock EHR link too) | All, demo | Sets the "as-of" date. Every view and alert recomputes as if it were that day. |
 | V9 | **AI assistant panel** | All | Natural-language questions and plain-language alert explanations. |
 | V10 | **Spread / footprint view** | R2 | For a chosen organism, phenotype or resistance profile: where it appears across wards over time, which wards share the same profile, and where the patients from a cluster went afterwards (PAT-03). |
-| V11 | **Mock patient-record (EHR) page** (demo) | Demo | A fake "doctor's main system" screen that calls our API and shows the returned cards (API-05). |
+| V11 | **Mock patient-record (EHR) page** (demo) | Demo | A clearly labelled "DEMO EHR": ward list with the demo patients (docs/DEMO.md), patient banner, risk information (patient-view), lab results, medication orders checked when chosen (order-select) and again when signed (order-sign, with "change to" suggestions and override reasons) (API-05). |
+| V13 | **Explore** | R2, R3 | The antibiogram behind every filter (VIEW-02): place, ward type, home area, specimen, organism, antibiotic, sex, age, onset, and the period (4 weeks + 12 months, a calendar year or a custom range). Each cell's details compare with Finland (DATA-08). |
 | V12 | **Overview drill-down** (home for R2, R3) | R2, R3 | Varha → institution → ward, exceptions only (UX-02/03): anomaly counts per child, the calm ones on one line, other Varha hospitals as placeholders. The ward level lists its anomalies with what to do, and keeps background (carriers, the avoid list, the full antibiogram) one click away. |
 
 ---
@@ -110,11 +111,11 @@ Three primary roles (keep it to ~3; confirm with the mentor, see §10.1).
 - [x] **DATA-01 (M)** Load and join all CSVs (cultures ↔ patients ↔ isolates ↔ susceptibility, plus code tables).
 - [x] **DATA-02 (M)** ❓ **First-isolate rule:** count only the first isolate per patient × organism × specimen type per analysis period. Apply this in every resistance-% calculation. (Explained in §11.)
 - [x] **DATA-03 (M)** **Hospital-acquired flag:** inpatient sample taken on day ≥ 3 after `admission_date`, i.e. `sample_date − admission_date ≥ 2` days, with the admission day counted as day 1. Convention to be confirmed (§10.1).
-- [~] **DATA-04 (M)** **Time windows** relative to the as-of date: rolling last 4 weeks, rolling last 12 months, calendar year, and an arbitrary custom range.
+- [x] **DATA-04 (M)** **Time windows** relative to the as-of date: rolling last 4 weeks, rolling last 12 months, calendar year, and an arbitrary custom range (the last two in Explore, V13).
 - [x] **DATA-05 (M)** **Incremental ingestion:** new rows can be appended and only affected aggregates recomputed. Architected like a live feed from the lab information system (Mylab).
 - [x] **DATA-06 (M)** Respect reporting rules: urine-only antibiotics (MEC, TMP, NIT) only for urine specimens.
 - [x] **DATA-07 (M)** **Intrinsic resistance table** (EUCAST Expected Resistant Phenotypes), e.g. Klebsiella–ampicillin, Proteus–nitrofurantoin. Show these as "intrinsically resistant", never as alerts or as "100 % resistance" findings.
-- [ ] **DATA-08 (C)** Optional national reference values (THL Finres) as a "Finland level" comparison line.
+- [x] **DATA-08 (C)** Optional national reference values (THL Finres) as a "Finland level" comparison line. Built from Finres 2023 (THL working paper 63/2024): a dotted line on trend charts, a "Finland, for comparison" section in each cell's details, a line on stewardship findings, `GET /api/national`. Reference only, never used for flags.
 
 ### 4.2 Statistical honesty (STAT)
 - [x] **STAT-01 (M)** Minimum-sample rule: a resistance % is shown as a headline number only when n ≥ 30 first isolates. Below that the cell shows an explicit "insufficient data" state, plus counts.
@@ -157,7 +158,7 @@ All detectors run automatically on every update (or as-of change) with general m
 
 ### 4.5 Views & usability (VIEW)
 - [~] **VIEW-01 (M)** V1 My Ward, as described in §3, with 4-week and 12-month side by side. **Visual quality is a priority.**
-- [~] **VIEW-02 (M)** Filters on dataset parameters: ward, ward type (in/out), institution, specimen, organism, antibiotic, sex, age band, hospital-acquired, period.
+- [x] **VIEW-02 (M)** Filters on dataset parameters: ward, ward type (in/out), institution, specimen, organism, antibiotic, sex, age band, hospital-acquired, period. All of them in Explore (V13, lab and infection control), plus home area; My Ward keeps the patient-group filters (UX-09).
 - [x] **VIEW-03 (M)** V3 Alert inbox and V4 Alert detail.
 - [x] **VIEW-04 (S)** V2 Therapy-helper mode inside V1 (❓ see "weighted syndromic antibiogram" in §11).
 - [x] **VIEW-05 (S)** V5 Ward × time heatmap.
@@ -173,7 +174,7 @@ All detectors run automatically on every update (or as-of change) with general m
 - [x] **LIVE-01 (M)** **Global as-of date (time cursor):** every view and every detector computes as if "today" were that date, using only data up to it.
 - [x] **LIVE-02 (M)** **Replay mode:** play data forward day by day (adjustable speed); views and alerts update live, with animated transitions; alerts appear at the moment they would have fired.
 - [ ] **LIVE-03 (C)** "What's new since last visit" summary for the user. Optional.
-- [x] **LIVE-04 (S)** Jump-to-event shortcuts for the demo (start replay just before each validation event in §8).
+- [x] **LIVE-04 (S)** Jump-to-event shortcuts for the demo: every alert raised so far; a jump sets the date to the day the alert was raised and does not start playing.
 
 ### 4.7 AI layer (AI): optional angle, via OpenRouter
 - [ ] **AI-01 (S)** Natural-language query, e.g. "80-year-old man, UTI, Geriatrics — what works?" → answered from the tool's computed statistics (V2 logic), with the numbers shown.
@@ -210,7 +211,7 @@ directions:
 
 The UI itself is a client of the same API.
 - [x] **API-01 (M)** REST API exposing the same statistics and alerts the UI uses.
-- [x] **API-02 (M)** **Prescribing context (pull,** `order-select` **style):** given ward + infection/specimen type (+ sex, age) and optionally the chosen antibiotic → resistance summary and active alerts as cards. E.g. "Ciprofloxacin: 25 % resistance in URO E. coli, last 4 weeks; active ESBL cluster on this ward."
+- [x] **API-02 (M)** **Prescribing context (pull,** `order-select` **style):** given ward + infection/specimen type (+ sex, age) and optionally the chosen antibiotic → resistance summary and active alerts as cards. E.g. "Ciprofloxacin: 25 % resistance in URO E. coli, last 4 weeks; active ESBL cluster on this ward." With a patient id, the patient's own isolates of the last 12 months come first (a resistant one is critical). An `order-sign` service repeats only the warnings, with override reasons and "change to" suggestions (WHO AWaRe Access agents first); feedback is received as in the standard.
 - [x] **API-03 (M)** **Patient context (pull,** `patient-view` **style):** given a patient id → carrier flags and relevant alerts. E.g. "Known ESBL carrier (positive 2025-06, URO). Use contact precautions."
 - [x] **API-04 (M)** **Push / webhooks:** send new alerts and new carrier flags to registered external endpoints, e.g. a mock "Tyks" receiver. Implements NOTIF-05.
 - [x] **API-05 (M)** V11 mock patient-record page that calls the API and renders the cards (demo).
@@ -323,7 +324,7 @@ This phase reworks *how* the data is presented, per role. Decide the approach be
 ## 7. Deliverables
 - [ ] Working tool (local web app)
 - [ ] Pitch deck mapped to the 4 judging criteria
-- [ ] Demo script / replay presets
+- [~] Demo script / replay presets (docs/DEMO.md: warmed dates, the mock record's patients and what each step shows)
 - [ ] README: how to run, methods used, limitations
 
 ---
@@ -459,6 +460,10 @@ E. faecalis (~10 %) is never tested for most agents and counts as not covered.
 | 2026-10-17 | **UX-07 likely cause:** a rise names an active, non-dismissed cluster or multi-ward alert on the same ward when ≥ 50 % (and ≥ 3) of the patients behind its resistant first isolates are that outbreak's cases (`RISE_CAUSE_*` in config). Patients, not isolates, are matched, since the two detectors may pick different isolates of the same patient. |
 | 2026-10-17 | **UX-08/09 as built:** "What to avoid" shows each infection as a section, own samples before borrowed ones; the infection control (All · Urinary · Bloodstream · Wound) replaces the specimen control, and the detail tables get their own specimen choice when "All" is on. The ward is a native select laid over the page title; the address carries it (`#/ward/MED-A`). |
 | 2026-10-17 | **UX-10 subgroups on the avoid list:** not split by default (n shrinks fast: URO has ~340 urine E. coli a year; sex × age bands leave many groups under 30 and send them to broader, less local figures, and many splits make chance findings). Instead each list tests its agents × main organisms × patient groups (group vs rest) and shows only groups that land on the other side of 20 % with an FDR-controlled difference. Order on the list: new, long-standing, some patients. |
+| 2026-10-17 | **DATA-08 national reference:** THL Finres 2023 values copied into `app/data/national.py` with their table numbers (the newest report found; no Finres 2024 could be confirmed). Finres counts first isolates per patient per calendar year from all Finnish labs, close to our rule; our wound samples are compared with Finres pus samples; urine E. coli is split by sex nationally and pooled by n without a sex filter. Shown as a reference line and a comparison sentence, never as a threshold or flag. |
+| 2026-10-17 | **VIEW-02 Explore (V13):** one page for lab and infection control with every filter, including the period (calendar year or custom range, one window instead of 4 weeks + 12 months). Clinicians keep the exceptions-first My Ward. Organism and antibiotic narrow the table's rows and columns. |
+| 2026-10-17 | **Mock record and order check:** the mock record is a visibly labelled demo EHR with two prepared patients (config `EHR_DEMO`, docs/DEMO.md). The order check uses the patient's own isolates of the last 12 months (`OWN_RESULT_DAYS`): a resistant one is a critical card ahead of the ward's figures. Carrier cards and resistance-shift alert cards are no longer repeated at order time (patient-view and the per-drug "risen" card say them). Alternatives come with CDS Hooks suggestions, WHO AWaRe Access agents first (`AWARE_GROUPS`), leaving out agents the patient's own isolates resisted and the reserve agent when others exist. `order-sign` returns only the warnings, with override reasons, or nothing. |
+| 2026-10-17 | **Demo speed (NF-01):** at startup a background thread computes the slow per-date results (the stewardship collection, ~10–20 s a date) for today, the mock record's date and the day each cluster / multi-ward / data-gap alert was raised, and pins those dates in the caches (`app/memo.py`) so replay doesn't evict them. "Jump to a past alert" goes to the day the alert was raised, without playing (was: 7 days before onset, playing). A clinician's alert list opens on the ward they are looking at. Trend findings no longer fail before Oct 2024 (no year-on-year comparison yet). |
 | 2026-10-17 | **UX-06 notifications demoted:** alerts are first-party (inbox, overview, detail); notifications are delivery (email / Teams / webhook) and live under settings. Clinicians lose the badge and the alert strip; their ward's alerts appear inside the exceptions list. Infection-control nav becomes Overview (home) · Alerts · Spread · Carriers · ⚙. |
 
 ## 10. To-do & open questions
@@ -538,4 +543,4 @@ Work is split into vertical slices, one commit series each. Update the status he
 | 4 | Patients + integration | PAT-01–03 · API-02–05 · NOTIF-03/05 · V2 therapy helper · V10 spread · V11 mock EHR · ANOM-05/09 · VIEW-08 roles (moved up from slice 5) | done |
 | 5 | Usability optimization | UX-02–06 (exceptions-first overview, Varha drill-down, clinician "avoid" view, notifications to settings, visual polish; UX-01 design decided) · role landing pages · VIEW-09 | done (UX-04 partly: older views keep plain styling) |
 | 5b | Review fixes | UX-07–10 (avoid list groups and links, all infections, ward switcher, subgroup exceptions) · ANOM-10 stewardship findings · orientation and demo bar | done |
-| 6 | AI, extension data, delivery | AI-01–04 · EXT-* · README, demo presets · polish of the older views (rest of UX-04) · spread redesign (§10) | next |
+| 6 | AI, extension data, delivery | DATA-08 national reference, VIEW-02 Explore, mock record rework, demo warm-up (done) · AI-01–04 · EXT-* · README, pitch · polish of the older views (rest of UX-04) · spread redesign (§10) | in progress |

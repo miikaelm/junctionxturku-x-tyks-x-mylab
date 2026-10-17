@@ -37,6 +37,9 @@ export interface Meta {
   antibiotics: { code: string; name: string; reported_for: string }[];
   infections: { key: Infection; label: string; specimen: Specimen }[];
   varha: { label: string; full: string; hospital: { key: string; label: string; full: string } };
+  national_source: NationalSource;
+  /** Mock patient record (V11): its date and the patients on its ward list (docs/DEMO.md). */
+  ehr_demo: { as_of: string; ward: string; patients: string[] };
   thresholds: {
     min_isolates: number;
     good_below: number;
@@ -49,6 +52,29 @@ export interface Meta {
 }
 
 export type Infection = "uti" | "bloodstream" | "wound";
+
+/** National reference (DATA-08): THL Finres. Reference only, never used for flags. */
+export interface NationalSource {
+  label: string;
+  publisher: string;
+  title: string;
+  year: number;
+  url: string;
+  portal: string;
+}
+
+export interface NationalRef {
+  pct: number;
+  n: number;
+  year: number;
+  source: string;
+  url: string;
+  tables: string[];
+  specimen_label: string;
+  group: string | null;
+  pooled: boolean;
+  label: string;
+}
 
 export type SplitBy = "sex" | "age_band" | "hospital_acquired" | "ward_type" | "home_area";
 
@@ -71,9 +97,15 @@ export interface WindowCell {
 
 export interface Cell {
   intrinsic: boolean;
+  national: NationalRef | null;
   recent: WindowCell;
   annual: WindowCell;
-  headline: "recent" | "annual" | null;
+  headline: string | null;
+}
+
+/** A cell's figures for any window key (a chosen period uses "year" or "custom"). */
+export function windowCell(cell: Cell, key: string): WindowCell {
+  return (cell as unknown as Record<string, WindowCell>)[key];
 }
 
 export interface SubRow {
@@ -101,7 +133,7 @@ export interface Antibiotic {
 }
 
 export interface TimeWindow {
-  key: "recent" | "annual";
+  key: "recent" | "annual" | "year" | "custom";
   label: string;
   start: string;
   end: string;
@@ -113,6 +145,9 @@ export interface Antibiogram {
   scope: { location: string; level: Level; label: string; specimen: Specimen };
   levels: { level: Level; location: string; label: string }[];
   windows: TimeWindow[];
+  /** One chosen period (VIEW-02) instead of 4 weeks + 12 months. */
+  period: boolean;
+  national_source: NationalSource;
   antibiotics: Antibiotic[];
   organisms: OrganismRow[];
 }
@@ -313,6 +348,12 @@ export interface AntibiogramQuery {
   sex?: "F" | "M";
   age_band?: string;
   hospital_acquired?: boolean;
+  ward_type?: "in" | "out";
+  home_area?: string;
+  /** A calendar year, or a custom period, instead of 4 weeks + 12 months (VIEW-02). */
+  year?: number;
+  period_start?: string;
+  period_end?: string;
   split_by?: SplitBy | "none";
   split_organism?: string;
   as_of?: string;
@@ -449,6 +490,7 @@ export interface TrendSeries {
     p_value: number | null;
     method: string;
   };
+  national: NationalRef | null;
 }
 
 export interface OverviewMarker {
@@ -557,7 +599,14 @@ export interface PatientSample {
   result: string;
   admission_date: string | null;
   hospital_acquired: boolean;
-  isolates: { isolate_id: string; organism: string; phenotypes: string[]; resistant: string[] }[];
+  isolates: {
+    isolate_id: string;
+    organism: string;
+    quantity: string;
+    phenotypes: string[];
+    resistant: string[];
+    susceptible: string[];
+  }[];
 }
 
 export interface Patient {
@@ -612,6 +661,21 @@ export interface CdsCard {
   detail: string;
   source: { label: string; url: string };
   links: { label: string; url: string; type: string }[];
+  /** CDS Hooks suggestions: here, "change to" another antibiotic. */
+  suggestions?: CdsSuggestion[];
+  selectionBehavior?: "at-most-one";
+  /** Offered at signing (order-sign) when the card stands. */
+  overrideReasons?: { system: string; code: string; display: string }[];
+}
+
+export interface CdsSuggestion {
+  label: string;
+  uuid: string;
+  actions: {
+    type: string;
+    description: string;
+    resource: { medicationCodeableConcept: { text: string; coding: { code: string; display: string }[] } };
+  }[];
 }
 
 export interface CdsService {
@@ -834,6 +898,7 @@ export interface Findings {
 
 export interface FindingDetail extends Finding {
   as_of: string;
+  national: NationalRef | null;
   history: { status: ReviewStatus; as_of: string; note: string; at: string }[];
 }
 
@@ -951,6 +1016,8 @@ export const api = {
   cdsServices: () => get<{ services: CdsService[] }>("/cds-services"),
   cds: (service: string, body: unknown, as_of: string) =>
     send<{ cards: CdsCard[] }>("POST", `/cds-services/${service}?as_of=${as_of}`, body),
+  cdsFeedback: (service: string, feedback: unknown[]) =>
+    send<{ ok: boolean }>("POST", `/cds-services/${service}/feedback`, { feedback }),
   subscriptions: (signal?: AbortSignal) => get<{ subscriptions: Subscription[] }>("/subscriptions", {}, signal),
   saveSubscription: (s: Subscription) => send<Subscription>("PUT", `/subscriptions/${encodeURIComponent(s.id)}`, s),
   deleteSubscription: (id: string) => send<{ deleted: string }>("DELETE", `/subscriptions/${encodeURIComponent(id)}`),

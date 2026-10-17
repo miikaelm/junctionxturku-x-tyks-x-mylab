@@ -143,3 +143,13 @@ Our convention: first isolate is taken *within the analysed stratum and window* 
   men only (URO 24 % (23/98) vs 3 % in women; MED-B 24 % vs 6 %), and bloodstream S. aureus clindamycin
   (hospital-wide figures) is 26 % (9/34) in 18–64-year-olds vs 2 % at other ages. None at 2025-06-27.
 - Children are not rare: 1,271 isolates from 0–17-year-olds (5 % of all).
+
+## Compared with Finland (THL Finres 2023, DATA-08), all locations, 12 months to 2026-09-27
+- Urine E. coli: TMP 20.1 % (n 2,557) vs 16.0 % nationally (the E4 drift puts us above); MEC 2.3 vs 2.5,
+  CXM 7.4 vs 6.8, CIP 8.7 vs 7.2, NIT 0.4 vs 0.4. Urine K. pneumoniae: CXM 12.2 vs 7.3, CIP 9.5 vs 5.1,
+  TMP 15.1 vs 13.7. Blood E. coli (n 94) and blood S. aureus (n 90: MRSA 6.7 vs 2.8, CLI 11.1 vs 5.6) are
+  small. The synthetic data is otherwise calibrated close to the national figures.
+- Mock record patients at 2025-06-27 (docs/DEMO.md): P006127 (M 89, URO since 19 Jun; ESBL E. coli
+  20 Jun, cluster case, earlier MRSA on GER) and P006301 (F 73, URO since 12 Jun; no positive culture
+  in the last year).
+- Before 2024-10-02 there are no "12 months before the last 12", so year-on-year crossings are empty.

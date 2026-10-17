@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
+import { useState } from "react";
 import { api, type ReplayEvent } from "../api/client";
 import { fmtDate } from "../lib/format";
 import { useFetch } from "../lib/hooks";
@@ -38,13 +39,16 @@ export function DemoBar({
   const { meta, asOf, setAsOf, playing, setPlaying, news, clearNews } = useApp();
   const events = useFetch((signal) => api.replayEvents(signal), [meta.data_version]);
   const atToday = asOf >= meta.default_as_of;
+  const [jumped, setJumped] = useState<ReplayEvent | null>(null);
 
+  // Jump to the day the alert was raised, and stay there: replay only starts on ▶.
   const jump = (id: string) => {
     const e = events.data?.events.find((x) => x.id === id);
     if (!e) return;
     clearNews();
-    setAsOf(e.replay_from);
-    setPlaying(true);
+    setPlaying(false);
+    setAsOf(e.first_seen);
+    setJumped(e);
   };
 
   const byType = new Map<string, ReplayEvent[]>();
@@ -71,6 +75,33 @@ export function DemoBar({
       transition={{ duration: 0.2 }}
     >
       <AnimatePresence>
+        {jumped && jumped.first_seen === asOf && news.length === 0 && (
+          <motion.div
+            className="demo-news"
+            role="status"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+          >
+            <div className="demo-news-head">
+              <strong>Now {fmtDate(asOf)}: the day this alert was raised</strong>
+              <button type="button" className="link-btn" onClick={() => setJumped(null)}>
+                Close
+              </button>
+            </div>
+            <ul>
+              <li>
+                <SeverityPill severity={jumped.severity} />{" "}
+                <a href={href({ view: "alert", id: jumped.id })}>
+                  <span className="mono">{jumped.wards.join(", ")}</span> {jumped.type_label}: {jumped.title}
+                </a>{" "}
+                <span className="muted small">
+                  {jumped.detection_days > 0 ? `${jumped.detection_days} d after the first case` : "on the day of the first case"}
+                </span>
+              </li>
+            </ul>
+          </motion.div>
+        )}
         {news.length > 0 && (
           <motion.div
             className="demo-news"

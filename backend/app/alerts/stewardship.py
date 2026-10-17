@@ -32,12 +32,13 @@ from app.config import (
 )
 from app.data.dataset import Dataset
 from app.data.scope import Scope
+from app.memo import Memo
 from app.stats import trends
 from app.stats.avoid import avoid
 
 KIND_ORDER = list(STEWARDSHIP_KINDS)
 
-_memo: dict[tuple, tuple[Dataset, dict]] = {}
+_memo = Memo(24)
 
 
 @lru_cache(maxsize=1)
@@ -140,10 +141,9 @@ def attach(
 
 
 def _collect(ds: Dataset, as_of: date) -> dict[str, dict]:
-    key = (id(ds), as_of)
-    hit = _memo.get(key)
-    if hit is not None and hit[0] is ds:
-        return hit[1]
+    hit = _memo.get(ds, (as_of,))
+    if hit is not None:
+        return hit
     found: dict[str, dict] = {}
     for ward in ds.wards.ward_code:
         for infection, cfg in THERAPY_INFECTIONS.items():
@@ -207,9 +207,7 @@ def _collect(ds: Dataset, as_of: date) -> dict[str, dict]:
                 "wards": [],
             }
 
-    if len(_memo) >= 8:
-        _memo.clear()
-    _memo[key] = (ds, found)
+    _memo.put(ds, (as_of,), as_of, found)
     return found
 
 

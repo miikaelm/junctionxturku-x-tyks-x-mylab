@@ -5,8 +5,15 @@ short *cards* it returns:
   - `aei-antibiotic-choice` (hook `order-select`): an antibiotic is being ordered → whether
     to avoid it for this infection on this ward (UX-05), alternatives without a warning, active
     alerts on the ward;
+  - `aei-antibiotic-sign` (hook `order-sign`): the order is being signed → only the warnings
+    about this antibiotic again, with override reasons and "change to" suggestions; nothing when
+    there is no warning, so the signature goes straight through;
   - `aei-patient-context` (hook `patient-view`): a patient record is opened → carrier flags
     and alerts the patient is part of.
+
+With a patientId, the order check also reads the patient's own recent isolates: a resistant result
+for the chosen antibiotic outranks the ward's figures. Feedback (accepted suggestion, override
+reason) is received at `POST /api/cds-services/{id}/feedback`, as the standard describes.
 
 Discovery is `GET /api/cds-services`, as the standard prescribes. The context is CDS Hooks
 shaped but simplified for the demo: plain fields (ward, infection, sex, age, antibiotic) next to
@@ -15,7 +22,8 @@ consistent (LIVE-01). Cards cite the statistics engine's own numbers only.
 """
 
 import uuid
-from datetime import date
+from collections import deque
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -25,6 +33,7 @@ from app.alerts import engine
 from app.alerts.anomalies import recent_rises
 from app.alerts.triage import get_triage_store
 from app.api.routes import AsOf, resolve_as_of
+from app.config import AWARE_GROUPS, OWN_RESULT_DAYS
 from app.data.dataset import get_dataset
 from app.data.scope import Scope
 from app.patients.registry import patient_record
@@ -44,6 +53,15 @@ SERVICES = [
         "prefetch": {},
     },
     {
+        "hook": "order-sign",
+        "id": "aei-antibiotic-sign",
+        "title": "AEI: check before an antibiotic order is signed",
+        "description": "When the order is signed: the warnings about this antibiotic again (local "
+        "resistance, a recent rise, the patient's own resistant isolate), with override reasons and "
+        "alternatives. No cards when there is nothing to warn about.",
+        "prefetch": {},
+    },
+    {
         "hook": "patient-view",
         "id": "aei-patient-context",
         "title": "AEI: carrier status and alerts for a patient",
@@ -55,6 +73,10 @@ SERVICES = [
 
 SOURCE = {"label": "AEI · Tyks Laboratories (decision support)", "url": config.UI_BASE_URL}
 CRITICAL_PHENOTYPES = {"CPE", "VRE"}
+
+
+# Feedback received from the record system (accepted suggestions, overrides). In memory: demo.
+FEEDBACK: deque = deque(maxlen=200)
 
 
 class CdsRequest(BaseModel):
@@ -74,12 +96,31 @@ def call_service(service_id: str, req: CdsRequest, as_of: date | None = AsOf) ->
     as_of = resolve_as_of(as_of)
     if service_id == "aei-antibiotic-choice":
         return {"cards": order_select(req.context, as_of)}
+    if service_id == "aei-antibiotic-sign":
+        return {"cards": order_select(req.context, as_of, sign=True)}
     if service_id == "aei-patient-context":
         pid = req.context.get("patientId")
         if not pid:
             raise HTTPException(422, "context.patientId is required")
         return {"cards": patient_view(pid, as_of)}
     raise HTTPException(404, f"no CDS service {service_id}")
+
+
+@router.post("/{service_id}/feedback")
+def feedback(service_id: str, body: dict) -> dict:
+    """CDS Hooks feedback: which card was accepted or overridden, and why."""
+    if service_id not in {s["id"] for s in SERVICES}:
+        raise HTTPException(404, f"no CDS service {service_id}")
+    for f in body.get("feedback", []):
+        FEEDBACK.appendleft(
+            {"service": service_id, "received": datetime.now().isoformat(timespec="seconds"), **f}
+        )
+    return {"ok": True}
+
+
+@router.get("/{service_id}/feedback")
+def feedback_log(service_id: str) -> dict:
+    return {"feedback": [f for f in FEEDBACK if f["service"] == service_id]}
 
 
 def card(summary: str, indicator: str, detail: str = "", links: list[dict] | None = None) -> dict:
@@ -182,7 +223,7 @@ def _groups_text(groups: list[dict], lead: str) -> str:
     )
 
 
-def order_select(context: dict, as_of: date) -> list[dict]:
+def order_select(context: dict, as_of: date, sign: bool = False) -> list[dict]:
     ds = get_dataset()
     pid = context.get("patientId")
     record = patient_record(ds, pid, as_of) if pid else None
@@ -210,7 +251,7 @@ def order_select(context: dict, as_of: date) -> list[dict]:
     flags = avoid(ds, scope, infection, as_of)
     rises = recent_rises(ds, as_of, get_triage_store(), {ward}, flags["specimen"])
     flags = with_recent_rises(flags, rises)
-    cards = []
+    drug: list[dict] = []  # about the chosen antibiotic itself: these come back at signing
     where = result["used"]["label"]
     basis = (
         f"Based on {result['isolates']} first isolates ({result['specimen']}), "
@@ -225,11 +266,34 @@ def order_select(context: dict, as_of: date) -> list[dict]:
     some = {x["code"]: x for x in flags["some_patients"]}
     items = {x["code"]: x for x in result["ranked"] + result["unranked"]}
     names = ds.antibiotics.set_index("antibiotic_code").antibiotic
+    own = _own_results(record, chosen, as_of) if chosen else []
+    own_resistant = [i for i in own if i["result"] == "R"]
+
+    if own_resistant:
+        first = own_resistant[0]
+        drug.append(
+            card(
+                f"This patient's own {first['organism']} was resistant to {names[chosen]} "
+                f"({first['specimen']}, {first['date']}, {first['ward']})",
+                "critical",
+                "The patient's own susceptibility results outrank the ward's figures.\n\n"
+                f"| Date | Ward | Specimen | Organism | {names[chosen].capitalize()} |\n"
+                "|---|---|---|---|---|\n"
+                + "\n".join(
+                    f"| {i['date']} | {i['ward']} | {i['specimen']} | {i['organism']} | "
+                    + ("resistant" if i["result"] == "R" else "susceptible")
+                    + " |"
+                    for i in own
+                )
+                + "\n\nFrom the lab results in AEI. Decision support, not a prescription.",
+                [link("Patient in AEI", f"patients/{record['patient_id']}")],
+            )
+        )
 
     if chosen in flagged:
         x = flagged[chosen]
         above = [o for o in x["organisms"] if o["status"] == "above"]
-        cards.append(
+        drug.append(
             card(
                 f"Avoid {x['name']} for a {label} on {ward}: "
                 + "; ".join(f"{o['organism']} {o['pct']:g} % resistant" for o in above),
@@ -245,12 +309,12 @@ def order_select(context: dict, as_of: date) -> list[dict]:
                 )
                 + _groups_text(x["subgroups"], "Under the limit for")
                 + f"\n\n{flags['method']} Decision support, not a prescription.",
-                [link("Open My Ward in AEI", "ward")],
+                [link("Open My Ward in AEI", f"ward/{ward}")],
             )
         )
     elif chosen in risen:
         x, r = risen[chosen], risen[chosen]["rise"]
-        cards.append(
+        drug.append(
             card(
                 f"{x['name'].capitalize()}: resistance has risen on {ward} in the last 4 weeks",
                 "warning",
@@ -278,7 +342,7 @@ def order_select(context: dict, as_of: date) -> list[dict]:
     elif chosen in unsuited:
         x = unsuited[chosen]
         intrinsic = [o["organism"] for o in x["organisms"] if o["status"] == "intrinsic"]
-        cards.append(
+        drug.append(
             card(
                 f"{x['name'].capitalize()} does not act on most {label} organisms",
                 "warning",
@@ -288,7 +352,7 @@ def order_select(context: dict, as_of: date) -> list[dict]:
     elif chosen in some:
         x = some[chosen]
         groups = ", ".join(g["label"].lower() for g in x["subgroups"])
-        cards.append(
+        drug.append(
             card(
                 f"{x['name'].capitalize()} on {ward}: no warning overall, but high in {groups}",
                 "warning",
@@ -297,7 +361,7 @@ def order_select(context: dict, as_of: date) -> list[dict]:
                 + _groups_text(x["subgroups"], "Over the limit for")
                 + "\n\nPass the patient's sex, age and onset (or a patientId) to check their group. "
                 "Decision support, not a prescription.",
-                [link("Open My Ward in AEI", "ward")],
+                [link("Open My Ward in AEI", f"ward/{ward}")],
             )
         )
     elif chosen and chosen in items:
@@ -314,7 +378,7 @@ def order_select(context: dict, as_of: date) -> list[dict]:
             + " |"
             for p in x["organisms"]
         )
-        cards.append(
+        drug.append(
             card(
                 f"No local resistance warning for {x['name']} ({label}, {ward})",
                 "info",
@@ -323,11 +387,11 @@ def order_select(context: dict, as_of: date) -> list[dict]:
                 f"{x['ci_high']} %). {basis}\n\n"
                 f"| Likely organism | Share | {x['name'].capitalize()} |\n|---|---|---|\n{rows}\n\n"
                 "Untested organisms count as not covered. Decision support, not a prescription.",
-                [link("Open My Ward in AEI", "ward")],
+                [link("Open My Ward in AEI", f"ward/{ward}")],
             )
         )
     elif chosen:
-        cards.append(
+        drug.append(
             card(
                 f"No local data on {names[chosen]} for {label}s",
                 "info",
@@ -336,39 +400,72 @@ def order_select(context: dict, as_of: date) -> list[dict]:
             )
         )
 
-    if chosen is None and flagged:
-        cards.append(
+    if own and not own_resistant:
+        first = own[0]
+        drug.append(
             card(
-                f"Avoid for a {label} on {ward}: " + ", ".join(x["name"] for x in flagged.values()),
-                "warning",
-                flags["method"],
-                [link("Open My Ward in AEI", "ward")],
+                f"This patient's own {first['organism']} was susceptible to {names[chosen]} "
+                f"({first['specimen']}, {first['date']})",
+                "info",
+                f"{len(own)} result{'s' if len(own) > 1 else ''} for {names[chosen]} in the last "
+                f"{OWN_RESULT_DAYS // 30} months, none resistant. From the lab results in AEI.",
             )
         )
-    if chosen in flagged or chosen in unsuited or chosen in risen:
-        clear = {x["code"] for x in flags["no_warning"]}
-        best = [b for b in result["ranked"] if b["code"] in clear][:3]
-        if best:
-            cards.append(
-                card(
-                    "Without a local warning: "
-                    + ", ".join(
-                        f"{b['name']} (~{round(b['coverage_pct'])} %"
-                        + (", reserve" if b["reserve"] else "")
-                        + ")"
-                        for b in best
-                    ),
-                    "info",
-                    f"Ranked by estimated coverage of {label}s. {basis} Choose by the local "
-                    "guideline: reserve agents such as meropenem are kept for resistant infections.",
-                    [link("Therapy helper in AEI", "ward")],
-                )
-            )
 
+    if chosen is None and (flagged or risen):
+        drug.append(
+            card(
+                f"For a {label} on {ward}, avoid: "
+                + ", ".join(x["name"] for x in [*flagged.values(), *risen.values()]),
+                "warning",
+                flags["method"],
+                [link("Open My Ward in AEI", f"ward/{ward}")],
+            )
+        )
+    if chosen in flagged or chosen in unsuited or chosen in risen or own_resistant:
+        clear = {x["code"] for x in flags["no_warning"]} - _own_resistant_codes(record, as_of)
+        best = [b for b in result["ranked"] if b["code"] in clear and b["code"] != chosen]
+        best = [b for b in best if not b["reserve"]] or best
+        # Access agents before Watch ones (WHO AWaRe), each group by coverage (ranked already).
+        best = sorted(best, key=lambda b: AWARE_ORDER.get(AWARE_GROUPS.get(b["code"]), 9))[:3]
+        if best:
+            alt = card(
+                "Without a local warning: "
+                + ", ".join(
+                    f"{b['name']} (~{round(b['coverage_pct'])} %"
+                    + (f", {AWARE_GROUPS[b['code']]}" if b["code"] in AWARE_GROUPS else "")
+                    + (", reserve" if b["reserve"] else "")
+                    + ")"
+                    for b in best
+                ),
+                "info",
+                f"WHO AWaRe Access agents first, then by estimated coverage of {label}s"
+                + (", leaving out agents this patient's own isolates resisted" if record else "")
+                + f". {basis} Choose by the local guideline: reserve agents such as meropenem are "
+                "kept for resistant infections.",
+                [link("Therapy helper in AEI", f"ward/{ward}")],
+            )
+            alt["suggestions"] = [_swap(b, context) for b in best]
+            alt["selectionBehavior"] = "at-most-one"
+            drug.append(alt)
+
+    if sign:
+        # order-sign: only what is about this antibiotic and should stop the signature.
+        if not any(c["indicator"] != "info" for c in drug):
+            return []
+        out = [c for c in drug if c["indicator"] != "info" or c.get("suggestions")]
+        for c in out:
+            if c["indicator"] != "info":
+                c["overrideReasons"] = OVERRIDE_REASONS
+        return out
+
+    # Ward alerts. A resistance shift is already told per antibiotic (the "risen" cards above) and
+    # carriage was shown when the record opened (patient-view), so neither is repeated here.
+    cards = list(drug)
     alerts = [
         a
         for a in engine.alerts_at(ds, as_of, get_triage_store(), wards={ward})
-        if not a["routine"] and a["triage"]["status"] != "dismissed"
+        if not a["routine"] and a["triage"]["status"] != "dismissed" and a["type"] != "rate_shift"
     ]
     for a in alerts[:3]:
         cards.append(
@@ -379,6 +476,90 @@ def order_select(context: dict, as_of: date) -> list[dict]:
                 [link("Open the alert in AEI", f"alerts/{a['id']}")],
             )
         )
-    if record:
-        cards += [carrier_card(f) for f in record["flags"]]
     return cards
+
+
+AWARE_ORDER = {"Access": 0, "Watch": 1, "Reserve": 2}
+
+# CDS Hooks override reasons, offered when a warning stands at signing (order-sign).
+OVERRIDE_REASONS = [
+    {
+        "system": "urn:aei:override",
+        "code": "own-result",
+        "display": "The patient's own result supports it",
+    },
+    {
+        "system": "urn:aei:override",
+        "code": "specialist",
+        "display": "Advised by an infectious-disease specialist",
+    },
+    {
+        "system": "urn:aei:override",
+        "code": "no-alternative",
+        "display": "No suitable alternative (allergy, interaction)",
+    },
+    {"system": "urn:aei:override", "code": "other", "display": "Other reason"},
+]
+
+
+def _own_results(record: dict | None, code: str, as_of: date) -> list[dict]:
+    """The patient's own isolates tested for `code` in the last OWN_RESULT_DAYS, newest first."""
+    if not record:
+        return []
+    start = (as_of - timedelta(days=OWN_RESULT_DAYS)).isoformat()
+    return [
+        {
+            "date": s["date"],
+            "ward": s["ward"],
+            "specimen": s["specimen"],
+            "organism": i["organism"],
+            "result": "R" if code in i["resistant"] else "S",
+        }
+        for s in record["samples"]
+        if s["date"] >= start
+        for i in s["isolates"]
+        if code in i["resistant"] or code in i["susceptible"]
+    ]
+
+
+def _own_resistant_codes(record: dict | None, as_of: date) -> set[str]:
+    if not record:
+        return set()
+    start = (as_of - timedelta(days=OWN_RESULT_DAYS)).isoformat()
+    return {
+        code
+        for s in record["samples"]
+        if s["date"] >= start
+        for i in s["isolates"]
+        for code in i["resistant"]
+    }
+
+
+def _swap(b: dict, context: dict) -> dict:
+    """A CDS Hooks suggestion: replace the draft order's antibiotic with `b`."""
+    draft = next(iter(context.get("selections") or []), "MedicationRequest/draft-1").split("/")[-1]
+    return {
+        "label": f"Change to {b['name']}",
+        "uuid": str(uuid.uuid4()),
+        "actions": [
+            {
+                "type": "update",
+                "description": f"Order {b['name']} instead",
+                "resource": {
+                    "resourceType": "MedicationRequest",
+                    "id": draft,
+                    "status": "draft",
+                    "medicationCodeableConcept": {
+                        "text": b["name"],
+                        "coding": [
+                            {
+                                "system": "urn:aei:antibiotic",
+                                "code": b["code"],
+                                "display": b["name"],
+                            }
+                        ],
+                    },
+                },
+            }
+        ],
+    }

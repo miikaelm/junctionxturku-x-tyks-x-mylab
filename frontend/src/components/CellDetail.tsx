@@ -1,6 +1,16 @@
 import { motion } from "motion/react";
 import { useEffect } from "react";
-import type { Antibiogram, Antibiotic, Cell, Estimate, OrganismRow, TimeWindow, WindowCell } from "../api/client";
+import {
+  windowCell,
+  type Antibiogram,
+  type Antibiotic,
+  type Cell,
+  type Estimate,
+  type NationalRef,
+  type OrganismRow,
+  type TimeWindow,
+  type WindowCell,
+} from "../api/client";
 import { fmtDate, pct, tier } from "../lib/format";
 import { useApp } from "../state/AppContext";
 import { CiBar } from "./CiBar";
@@ -13,7 +23,10 @@ interface Props {
   onClose: () => void;
 }
 
-/** Explains one cell: every level and window, counts, intervals, and what was shown and why. */
+/**
+ * Explains one cell: every level and window, counts, intervals, what was shown and why, and the
+ * national figure for comparison (DATA-08).
+ */
 export function CellDetail({ data, row, cell, antibiotic, onClose }: Props) {
   const { meta } = useApp();
   useEffect(() => {
@@ -65,12 +78,21 @@ export function CellDetail({ data, row, cell, antibiotic, onClose }: Props) {
             {antibiotic.name} (EUCAST Expected Resistant Phenotypes). This is not a surveillance
             finding and never triggers an alert: the agent should not be used for this organism.
           </div>
+        ) : data.period ? (
+          <p className="drawer-summary">{periodSummary(data, cell, meta.thresholds.min_isolates)}</p>
         ) : (
           <p className="drawer-summary">{summary(data, cell, meta.thresholds.min_isolates)}</p>
         )}
 
-        <WindowSection title="Last 4 weeks" win={recentWin} wc={cell.recent} data={data} />
-        <WindowSection title="Last 12 months" win={annualWin} wc={cell.annual} data={data} />
+        {data.period ? (
+          <WindowSection title={recentWin.label} win={recentWin} wc={windowCell(cell, recentWin.key)} data={data} />
+        ) : (
+          <>
+            <WindowSection title="Last 4 weeks" win={recentWin} wc={cell.recent} data={data} />
+            <WindowSection title="Last 12 months" win={annualWin} wc={cell.annual} data={data} />
+          </>
+        )}
+        {!cell.intrinsic && <NationalSection nat={cell.national} local={localFigure(data, cell)} />}
 
         <footer className="drawer-foot">
           Counts use the first isolate per patient, organism and specimen in each window. A
@@ -118,6 +140,61 @@ function WindowSection({ title, win, wc, data }: { title: string; win: TimeWindo
       </ul>
     </section>
   );
+}
+
+/** The figure the table shows for this cell (12 months, or the chosen period). */
+function localFigure(data: Antibiogram, cell: Cell): Estimate | null {
+  const key = data.period ? data.windows[0].key : "annual";
+  const wc = windowCell(cell, key);
+  return wc.shown === null ? null : wc.levels[wc.shown];
+}
+
+function NationalSection({ nat, local }: { nat: NationalRef | null; local: Estimate | null }) {
+  return (
+    <section className="drawer-section">
+      <h3>
+        Finland, for comparison
+        <span className="muted small">reference only</span>
+      </h3>
+      {nat ? (
+        <>
+          <p className="national-line">
+            <strong className="mono">{nat.pct} %</strong> resistant in {nat.year}
+            {nat.group ? `, ${nat.group}` : ""} ({nat.specimen_label}, {nat.n.toLocaleString("en-GB")} first isolates
+            nationwide)
+            {local?.pct != null && (
+              <span className="muted">
+                {" "}
+                · here {Math.round(local.pct)} %
+                {local.ci_low > nat.pct ? ", above the national figure (whole interval)" : ""}
+                {local.ci_high < nat.pct ? ", below the national figure (whole interval)" : ""}
+              </span>
+            )}
+          </p>
+          <p className="muted small">
+            <a href={nat.url} target="_blank" rel="noreferrer">
+              {nat.source}
+            </a>{" "}
+            ({nat.tables.join(", ")}). Finres also counts the first isolate per patient, but per calendar year and from
+            every Finnish laboratory
+            {nat.specimen_label === "pus" ? "; our wound samples are compared with its pus samples" : ""}
+            {nat.pooled ? "; women and men pooled, weighted by the number tested" : ""}.
+          </p>
+        </>
+      ) : (
+        <p className="muted small">THL Finres publishes no national figure for this combination.</p>
+      )}
+    </section>
+  );
+}
+
+function periodSummary(data: Antibiogram, cell: Cell, minN: number): string {
+  const win = data.windows[0];
+  const wc = windowCell(cell, win.key);
+  const own = wc.levels[0];
+  if (wc.shown === null) return `Too few isolates for a reliable percentage at any level in ${win.label} (${own.r}/${own.n} here).`;
+  if (wc.shown === 0) return `${win.label} on ${data.levels[0].label}: ${describe(own)}.`;
+  return `Only ${own.n} isolate${own.n === 1 ? "" : "s"} on ${data.levels[0].label} in ${win.label} (fewer than ${minN}), so the ${data.levels[wc.shown].label.toLowerCase()} figure is shown: ${describe(wc.levels[wc.shown])}.`;
 }
 
 function describe(e: Estimate): string {

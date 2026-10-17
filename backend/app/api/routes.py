@@ -10,12 +10,12 @@ import pandas as pd
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from app import config
+from app import config, demo
 from app.alerts import engine, notify, stewardship
 from app.alerts.anomalies import anomalies, recent_rises
 from app.alerts.detail import episode_detail
 from app.alerts.triage import STATUSES, TriageStore, get_triage_store
-from app.data import windows
+from app.data import national, windows
 from app.data.dataset import get_dataset
 from app.data.freshness import feed_status, ward_freshness
 from app.data.intrinsic import INTRINSIC_RESISTANCE
@@ -32,6 +32,8 @@ from app.stats.therapy import therapy
 router = APIRouter(prefix="/api")
 
 AsOf = Query(None, description="Compute as if this day were today (default: scenario today)")
+PeriodStart = Query(None, description="A custom period instead of 4 weeks + 12 months (inclusive)")
+PeriodEnd = Query(None, description="End of the custom period (default: as_of)")
 Store = Annotated[TriageStore, Depends(get_triage_store)]
 Reviews = Annotated[TriageStore, Depends(stewardship.get_stewardship_store)]
 Subs = Annotated[notify.SubscriptionStore, Depends(notify.get_subscription_store)]
@@ -127,6 +129,8 @@ def meta() -> dict:
             "full": config.VARHA_FULL,
             "hospital": config.VARHA_HOSPITAL,
         },
+        "national_source": national.SOURCE,
+        "ehr_demo": demo.ehr_demo(),
         "thresholds": {
             "min_isolates": config.MIN_ISOLATES_FOR_PERCENT,
             "good_below": config.RESISTANCE_GOOD_BELOW,
@@ -146,6 +150,11 @@ def antibiogram(
     sex: Literal["F", "M"] | None = None,
     age_band: str | None = None,
     hospital_acquired: bool | None = None,
+    ward_type: Literal["in", "out"] | None = None,
+    home_area: str | None = None,
+    year: int | None = Query(None, description="Calendar year instead of 4 weeks + 12 months"),
+    period_start: date | None = PeriodStart,
+    period_end: date | None = PeriodEnd,
     split_by: Annotated[
         SplitBy | None,
         Query(
@@ -156,13 +165,33 @@ def antibiogram(
     split_organism: str | None = None,
     as_of: date | None = AsOf,
 ) -> dict:
-    """Organism × antibiotic resistance: last 4 weeks and last 12 months, with fallbacks."""
+    """Organism × antibiotic resistance: last 4 weeks and last 12 months, with fallbacks; or one
+    period (a calendar year or a custom range, VIEW-02). Cells carry the national reference."""
     ds = get_dataset()
+    day = resolve_as_of(as_of)
     if age_band is not None and age_band not in {b for b, _, _ in config.AGE_BANDS}:
         raise HTTPException(422, f"unknown age_band: {age_band}")
+    if home_area is not None and home_area not in set(ds.cultures.home_area.dropna()):
+        raise HTTPException(422, f"unknown home_area: {home_area}")
     scope = _scope(
-        location, specimen, sex=sex, age_band=age_band, hospital_acquired=hospital_acquired
+        location,
+        specimen,
+        sex=sex,
+        age_band=age_band,
+        hospital_acquired=hospital_acquired,
+        ward_type=ward_type,
+        home_area=home_area,
     )
+    period = None
+    try:
+        if year is not None:
+            if not ds.start.year <= year <= day.year:
+                raise ValueError(f"no data for {year} up to {day}")
+            period = windows.calendar_year(day, year)
+        elif period_start is not None:
+            period = windows.custom(day, max(period_start, ds.start.date()), period_end or day)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
     split = None
     if split_by is None:
         default = next((d for d in config.DEFAULT_SPLITS if d["specimen"] == specimen), None)
@@ -174,7 +203,7 @@ def antibiogram(
         if getattr(scope, split_by) is not None:
             raise HTTPException(422, f"already filtered by {split_by}")
         split = Split(split_organism, split_by)
-    return build_antibiogram(ds, scope, resolve_as_of(as_of), split)
+    return build_antibiogram(ds, scope, day, split, period)
 
 
 @router.get("/subgroups")
@@ -197,6 +226,12 @@ def subgroups(
     return {"as_of": as_of.isoformat(), **discover(ds, _scope(location, specimen), win)}
 
 
+@router.get("/national")
+def national_reference() -> dict:
+    """Finland-level reference values (DATA-08), as published by THL Finres. Reference only."""
+    return {"source": national.SOURCE, "values": national.table()}
+
+
 @router.get("/trends/findings")
 def trend_findings(as_of: date | None = AsOf) -> dict:
     """Significant long-term trends and empirical-threshold crossings, all locations (ANOM-03)."""
@@ -216,7 +251,8 @@ def trend_series(
     if (organism, antibiotic) not in ds.tested_pairs:
         raise HTTPException(422, f"{organism} is not tested for {antibiotic}")
     scope = _scope(location, specimen)
-    return trends.series(ds, scope, organism, antibiotic, resolve_as_of(as_of))
+    out = trends.series(ds, scope, organism, antibiotic, resolve_as_of(as_of))
+    return {**out, "national": national.lookup(organism, specimen, antibiotic)}
 
 
 @router.get("/overview")
@@ -670,7 +706,8 @@ def stewardship_finding(finding_id: str, reviews: Reviews, as_of: date | None = 
     f = stewardship.finding(get_dataset(), as_of, reviews, finding_id)
     if f is None:
         raise HTTPException(404, f"no finding {finding_id} as of {as_of}")
-    return {"as_of": as_of.isoformat(), **f}
+    ref = national.lookup(f["organism"], f["specimen"], f["antibiotic_code"])
+    return {"as_of": as_of.isoformat(), **f, "national": ref}
 
 
 class ReviewAction(BaseModel):

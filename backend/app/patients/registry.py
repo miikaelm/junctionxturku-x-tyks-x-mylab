@@ -91,8 +91,9 @@ def patient_record(ds: Dataset, patient_id: str, as_of: date) -> dict | None:
     if cul.empty:
         return None
     iso = ds.isolates[ds.isolates.culture_id.isin(cul.culture_id)]
-    ast = ds.ast[ds.ast.isolate_id.isin(iso.isolate_id) & ds.ast.resistant]
-    resistant = ast.groupby("isolate_id").antibiotic_code.agg(list)
+    ast = ds.ast[ds.ast.isolate_id.isin(iso.isolate_id)]
+    resistant = ast[ast.resistant].groupby("isolate_id").antibiotic_code.agg(list)
+    susceptible = ast[~ast.resistant].groupby("isolate_id").antibiotic_code.agg(list)
     by_culture: dict[str, list[dict]] = {}
     for i in iso.itertuples(index=False):
         by_culture.setdefault(i.culture_id, []).append(
@@ -100,7 +101,9 @@ def patient_record(ds: Dataset, patient_id: str, as_of: date) -> dict | None:
                 "isolate_id": i.isolate_id,
                 "organism": i.organism,
                 "phenotypes": [p for p in PHENOTYPES if getattr(i, p.lower()) == 1],
+                "quantity": i.quantity,
                 "resistant": resistant.get(i.isolate_id, []),
+                "susceptible": susceptible.get(i.isolate_id, []),
             }
         )
     last = cul.iloc[-1]
