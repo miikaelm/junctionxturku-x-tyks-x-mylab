@@ -3,8 +3,6 @@
 A continuously updated antimicrobial-resistance surveillance tool, built for the Tyks Laboratories ×
 Mylab challenge at JunctionX Turku by **First Isolate** (Miikael Mändmets).
 
-**Live demo:** https://memand-aei.hf.space (hosted for the judging; may be taken down afterwards)
-
 **Demo video (2 min):** https://youtu.be/iAPOzSQRnzA
 
 Today, Tyks compiles resistance reports once a year, for the whole hospital. A doctor choosing an
