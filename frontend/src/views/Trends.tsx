@@ -316,7 +316,9 @@ function summary(s: TrendSeries): string {
   const rate = `${Math.abs(t.pp_per_year)} percentage points per year`;
   let out = t.significant
     ? `Significant ${dir} trend: about ${rate} (${t.change_pp > 0 ? "+" : ""}${t.change_pp} pp over the period, q ${fmtP(t.q_value ?? undefined)}).`
-    : `No significant trend (${dir} by ${rate}, p ${fmtP(t.p_value)}).`;
+    : t.q_value === null
+      ? `No trend flagged: ${dir} by ${rate}, under 5 percentage points over the period.`
+      : `${dir[0].toUpperCase()}${dir.slice(1)} by ${rate} (p ${fmtP(t.p_value)}), but not significant once corrected for all the series tested (q ${fmtP(t.q_value)}).`;
   if (s.trend_crosses_threshold) out += ` The trend line crosses ${s.threshold_pct} % in ${s.trend_crosses_threshold}.`;
   return out;
 }

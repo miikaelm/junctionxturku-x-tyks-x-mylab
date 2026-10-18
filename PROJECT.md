@@ -325,7 +325,7 @@ This phase reworks *how* the data is presented, per role. Decide the approach be
 - [ ] Working tool (local web app)
 - [ ] Pitch deck mapped to the 4 judging criteria
 - [~] Demo script / replay presets (docs/DEMO.md: warmed dates, the mock record's patients and what each step shows)
-- [ ] README: how to run, methods used, limitations
+- [x] README: how to run, methods used, limitations
 
 ---
 

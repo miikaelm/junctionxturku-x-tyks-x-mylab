@@ -21,3 +21,6 @@ Thumbs.db
 
 # AEI runtime state (triage)
 backend/.state/
+
+# Pitch notes (kept local)
+docs/PITCH.md
